@@ -104,36 +104,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Manual Analysis
   app.post("/api/analyze-listing", async (req, res) => {
+    // Add cache-busting headers
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+    
     try {
       const { url } = req.body;
       
-      if (!url || typeof url !== "string") {
-        return res.status(400).json({ error: "URL is required" });
+      // Validate URL
+      if (!url || !url.includes('vinted')) {
+        return res.status(400).json({
+          error: 'Invalid Vinted URL',
+          isValuable: false,
+          confidence: 0,
+          detectedMaterials: [],
+          reasons: ['Invalid URL provided'],
+          lotType: 'single'
+        });
       }
 
       const listing = await scrapeVintedListing(url);
       
       if (!listing) {
-        return res.status(404).json({ error: "Could not fetch listing" });
+        return res.status(404).json({
+          error: "Could not fetch listing",
+          isValuable: false,
+          confidence: 0,
+          detectedMaterials: [],
+          reasons: ['Failed to fetch listing from Vinted'],
+          lotType: 'single'
+        });
       }
 
-      const analysis = await analyzeJewelryImages(listing.imageUrls, listing.title);
+      const analysis = await analyzeJewelryImages(
+        listing.imageUrls,
+        listing.title,
+        listing.description
+      );
 
       const scan = await storage.createManualScan({
         listingUrl: url,
         listingTitle: listing.title,
-        confidenceScore: analysis.confidenceScore,
-        aiReasoning: analysis.reasoning,
+        confidenceScore: analysis.confidence,
+        aiReasoning: analysis.reasons.join('; '),
         detectedMaterials: analysis.detectedMaterials,
+        reasons: analysis.reasons,
+        isValuable: analysis.isValuable,
+        lotType: analysis.lotType,
         price: listing.price,
       });
 
+      // Always return complete response
       res.json({
-        ...scan,
+        listingUrl: url,
+        listingTitle: listing.title,
+        price: listing.price,
         isValuable: analysis.isValuable,
+        confidence: analysis.confidence,
+        detectedMaterials: analysis.detectedMaterials || [],
+        reasons: analysis.reasons || [],
+        lotType: analysis.lotType || 'single'
       });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({
+        error: error.message,
+        isValuable: false,
+        confidence: 0,
+        detectedMaterials: [],
+        reasons: ['Analysis failed: ' + error.message],
+        lotType: 'single'
+      });
     }
   });
 

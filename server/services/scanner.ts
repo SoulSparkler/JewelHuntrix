@@ -31,15 +31,16 @@ export async function scanSearchQuery(searchQuery: SearchQuery): Promise<number>
       await storage.createAnalyzedListing({
         listingId: listing.listingId,
         searchQueryId: searchQuery.id,
-        confidenceScore: analysis.confidenceScore,
-        isValuable: analysis.confidenceScore >= searchQuery.confidenceThreshold,
+        confidenceScore: analysis.confidence,
+        isValuable: analysis.confidence >= searchQuery.confidenceThreshold,
+        lotType: analysis.lotType,
       });
 
-      if (analysis.confidenceScore >= searchQuery.confidenceThreshold && analysis.isValuable) {
-        console.log(`✅ Valuable item found! Confidence: ${analysis.confidenceScore}%`);
+      if (analysis.confidence >= searchQuery.confidenceThreshold && analysis.isValuable) {
+        console.log(`✅ Valuable item found! Confidence: ${analysis.confidence}%`);
         
-        const totalCost = (listing.price || 0) + 4.0;
-        const advice = getBuyAdvice(analysis.confidenceScore, totalCost);
+        const totalCost = parseFloat(listing.price?.replace(/[€,\s]/g, '') || '0') + 4.0;
+        const advice = getBuyAdvice(analysis.confidence, totalCost);
 
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 15);
@@ -49,9 +50,12 @@ export async function scanSearchQuery(searchQuery: SearchQuery): Promise<number>
           listingUrl: listing.listingUrl,
           listingTitle: listing.title,
           price: listing.price,
-          confidenceScore: analysis.confidenceScore,
-          aiReasoning: analysis.reasoning,
+          confidenceScore: analysis.confidence,
+          aiReasoning: analysis.reasons.join('; '),
           detectedMaterials: analysis.detectedMaterials,
+          reasons: analysis.reasons,
+          isValuable: analysis.isValuable,
+          lotType: analysis.lotType,
           searchQueryId: searchQuery.id,
           telegramSent: false,
           expiresAt,
@@ -61,9 +65,9 @@ export async function scanSearchQuery(searchQuery: SearchQuery): Promise<number>
           listing.title,
           listing.listingUrl,
           listing.price,
-          analysis.confidenceScore,
+          analysis.confidence,
           analysis.detectedMaterials,
-          analysis.reasoning,
+          analysis.reasons.join('; '),
           advice
         );
 
@@ -73,7 +77,7 @@ export async function scanSearchQuery(searchQuery: SearchQuery): Promise<number>
 
         newFindings++;
       } else {
-        console.log(`Item below threshold (${analysis.confidenceScore}%) - not creating finding`);
+        console.log(`Item below threshold (${analysis.confidence}%) - not creating finding`);
       }
 
       await new Promise(resolve => setTimeout(resolve, 3000));

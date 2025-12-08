@@ -3,12 +3,16 @@ import { pgTable, text, varchar, integer, boolean, timestamp, decimal, jsonb } f
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Lot type enum for categorizing jewelry listings
+export const lotTypeEnum = z.enum(['single', 'vintage_lot', 'estate', 'mixed']);
+export type LotType = z.infer<typeof lotTypeEnum>;
+
 export const searchQueries = pgTable("search_queries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   vintedUrl: text("vinted_url").notNull(),
   searchLabel: text("search_label").notNull(),
   scanFrequencyHours: integer("scan_frequency_hours").notNull().default(3),
-  confidenceThreshold: integer("confidence_threshold").notNull().default(80),
+  confidenceThreshold: integer("confidence_threshold").notNull().default(70),
   isActive: boolean("is_active").notNull().default(true),
   lastScannedAt: timestamp("last_scanned_at"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
@@ -21,6 +25,7 @@ export const analyzedListings = pgTable("analyzed_listings", {
   analyzedAt: timestamp("analyzed_at").notNull().default(sql`now()`),
   confidenceScore: integer("confidence_score").notNull(),
   isValuable: boolean("is_valuable").notNull(),
+  lotType: text("lot_type").notNull().default("single"),
 });
 
 export const findings = pgTable("findings", {
@@ -32,6 +37,9 @@ export const findings = pgTable("findings", {
   confidenceScore: integer("confidence_score").notNull(),
   aiReasoning: text("ai_reasoning").notNull(),
   detectedMaterials: jsonb("detected_materials").notNull().$type<string[]>(),
+  reasons: jsonb("reasons").notNull().$type<string[]>(),
+  isValuable: boolean("is_valuable").notNull().default(false),
+  lotType: text("lot_type").notNull().default("single"),
   searchQueryId: varchar("search_query_id").references(() => searchQueries.id),
   foundAt: timestamp("found_at").notNull().default(sql`now()`),
   telegramSent: boolean("telegram_sent").notNull().default(false),
@@ -45,6 +53,9 @@ export const manualScans = pgTable("manual_scans", {
   confidenceScore: integer("confidence_score").notNull(),
   aiReasoning: text("ai_reasoning").notNull(),
   detectedMaterials: jsonb("detected_materials").notNull().$type<string[]>(),
+  reasons: jsonb("reasons").notNull().$type<string[]>(),
+  isValuable: boolean("is_valuable").notNull().default(false),
+  lotType: text("lot_type").notNull().default("single"),
   price: text("price"),
   scannedAt: timestamp("scanned_at").notNull().default(sql`now()`),
 });

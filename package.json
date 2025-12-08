@@ -48,6 +48,8 @@
     "@types/node-telegram-bot-api": "^0.64.11",
     "axios": "^1.12.2",
     "cheerio": "^1.1.2",
+    "pg": "^8.13.1",
+    "puppeteer": "^23.11.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -87,6 +89,7 @@
     "zod-validation-error": "^3.4.0"
   },
   "devDependencies": {
+    "@types/pg": "^8.11.10",
     "@replit/vite-plugin-cartographer": "^0.3.1",
     "@replit/vite-plugin-dev-banner": "^0.1.1",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",

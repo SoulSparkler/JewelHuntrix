@@ -1,4 +1,10 @@
+import { eq, desc, lt, and } from "drizzle-orm";
+import { db } from "./db";
 import {
+  searchQueries,
+  analyzedListings,
+  findings,
+  manualScans,
   type SearchQuery,
   type InsertSearchQuery,
   type AnalyzedListing,
@@ -7,8 +13,7 @@ import {
   type InsertFinding,
   type ManualScan,
   type InsertManualScan,
-} from "@shared/schema";
-import { randomUUID } from "crypto";
+} from "../shared/schema";
 
 export interface IStorage {
   // Search Queries
@@ -36,152 +41,134 @@ export interface IStorage {
   deleteManualScan(id: string): Promise<boolean>;
 }
 
-export class MemStorage implements IStorage {
-  private searchQueries: Map<string, SearchQuery>;
-  private analyzedListings: Map<string, AnalyzedListing>;
-  private findings: Map<string, Finding>;
-  private manualScans: Map<string, ManualScan>;
-
-  constructor() {
-    this.searchQueries = new Map();
-    this.analyzedListings = new Map();
-    this.findings = new Map();
-    this.manualScans = new Map();
-  }
-
+export class PostgresStorage implements IStorage {
+  // Search Queries
   async getSearchQueries(): Promise<SearchQuery[]> {
-    return Array.from(this.searchQueries.values());
+    return await db.select().from(searchQueries).orderBy(desc(searchQueries.createdAt));
   }
 
   async getSearchQuery(id: string): Promise<SearchQuery | undefined> {
-    return this.searchQueries.get(id);
+    const results = await db.select().from(searchQueries).where(eq(searchQueries.id, id));
+    return results[0];
   }
 
   async createSearchQuery(insertQuery: InsertSearchQuery): Promise<SearchQuery> {
-    const id = randomUUID();
-    const query: SearchQuery = {
+    const results = await db.insert(searchQueries).values({
       vintedUrl: insertQuery.vintedUrl,
       searchLabel: insertQuery.searchLabel,
       scanFrequencyHours: insertQuery.scanFrequencyHours ?? 3,
-      confidenceThreshold: insertQuery.confidenceThreshold ?? 80,
+      confidenceThreshold: insertQuery.confidenceThreshold ?? 70,
       isActive: insertQuery.isActive ?? true,
-      id,
-      createdAt: new Date(),
-      lastScannedAt: null,
-    };
-    this.searchQueries.set(id, query);
-    return query;
+    }).returning();
+    return results[0];
   }
 
   async updateSearchQuery(id: string, updates: Partial<InsertSearchQuery>): Promise<SearchQuery | undefined> {
-    const existing = this.searchQueries.get(id);
-    if (!existing) return undefined;
-    
-    const updated = { ...existing, ...updates };
-    this.searchQueries.set(id, updated);
-    return updated;
+    const results = await db.update(searchQueries)
+      .set(updates)
+      .where(eq(searchQueries.id, id))
+      .returning();
+    return results[0];
   }
 
   async deleteSearchQuery(id: string): Promise<boolean> {
-    return this.searchQueries.delete(id);
+    const results = await db.delete(searchQueries).where(eq(searchQueries.id, id)).returning();
+    return results.length > 0;
   }
 
   async updateLastScanned(id: string): Promise<void> {
-    const query = this.searchQueries.get(id);
-    if (query) {
-      query.lastScannedAt = new Date();
-      this.searchQueries.set(id, query);
-    }
+    await db.update(searchQueries)
+      .set({ lastScannedAt: new Date() })
+      .where(eq(searchQueries.id, id));
   }
 
+  // Analyzed Listings
   async getAnalyzedListing(listingId: string): Promise<AnalyzedListing | undefined> {
-    return Array.from(this.analyzedListings.values()).find(
-      (listing) => listing.listingId === listingId
-    );
+    const results = await db.select().from(analyzedListings).where(eq(analyzedListings.listingId, listingId));
+    return results[0];
   }
 
   async createAnalyzedListing(insertListing: InsertAnalyzedListing): Promise<AnalyzedListing> {
-    const id = randomUUID();
-    const listing: AnalyzedListing = {
+    const results = await db.insert(analyzedListings).values({
       listingId: insertListing.listingId,
       searchQueryId: insertListing.searchQueryId ?? null,
       confidenceScore: insertListing.confidenceScore,
       isValuable: insertListing.isValuable,
-      id,
-      analyzedAt: new Date(),
-    };
-    this.analyzedListings.set(id, listing);
-    return listing;
+      lotType: insertListing.lotType ?? 'single',
+    }).returning();
+    return results[0];
   }
 
+  // Findings
   async getFindings(): Promise<Finding[]> {
-    return Array.from(this.findings.values())
-      .filter(f => f.expiresAt > new Date())
-      .sort((a, b) => b.foundAt.getTime() - a.foundAt.getTime());
+    const now = new Date();
+    return await db.select()
+      .from(findings)
+      .where(lt(findings.expiresAt, now))
+      .orderBy(desc(findings.foundAt));
   }
 
   async getFinding(id: string): Promise<Finding | undefined> {
-    return this.findings.get(id);
+    const results = await db.select().from(findings).where(eq(findings.id, id));
+    return results[0];
   }
 
   async createFinding(insertFinding: InsertFinding): Promise<Finding> {
-    const id = randomUUID();
-    const finding: Finding = {
+    const results = await db.insert(findings).values({
       listingId: insertFinding.listingId,
       listingUrl: insertFinding.listingUrl,
       listingTitle: insertFinding.listingTitle,
       price: insertFinding.price,
       confidenceScore: insertFinding.confidenceScore,
       aiReasoning: insertFinding.aiReasoning,
-      detectedMaterials: Array.from(insertFinding.detectedMaterials, String),
+      detectedMaterials: insertFinding.detectedMaterials,
+      reasons: insertFinding.reasons,
+      isValuable: insertFinding.isValuable,
+      lotType: insertFinding.lotType ?? 'single',
       searchQueryId: insertFinding.searchQueryId ?? null,
       telegramSent: insertFinding.telegramSent ?? false,
       expiresAt: insertFinding.expiresAt,
-      id,
-      foundAt: new Date(),
-    };
-    this.findings.set(id, finding);
-    return finding;
+    } as any).returning();
+    return results[0];
   }
 
   async deleteFinding(id: string): Promise<boolean> {
-    return this.findings.delete(id);
+    const results = await db.delete(findings).where(eq(findings.id, id)).returning();
+    return results.length > 0;
   }
 
   async deleteExpiredFindings(): Promise<void> {
     const now = new Date();
-    const entries = Array.from(this.findings.entries());
-    for (const [id, finding] of entries) {
-      if (finding.expiresAt <= now) {
-        this.findings.delete(id);
-      }
-    }
+    await db.delete(findings).where(lt(findings.expiresAt, now));
   }
 
+  // Manual Scans
   async getManualScans(): Promise<ManualScan[]> {
-    return Array.from(this.manualScans.values())
-      .sort((a, b) => b.scannedAt.getTime() - a.scannedAt.getTime());
+    return await db.select()
+      .from(manualScans)
+      .orderBy(desc(manualScans.scannedAt));
   }
 
   async createManualScan(insertScan: InsertManualScan): Promise<ManualScan> {
-    const id = randomUUID();
-    const scan: ManualScan = {
+    const results = await db.insert(manualScans).values({
       listingUrl: insertScan.listingUrl,
       listingTitle: insertScan.listingTitle,
       confidenceScore: insertScan.confidenceScore,
       aiReasoning: insertScan.aiReasoning,
-      detectedMaterials: Array.from(insertScan.detectedMaterials, String),
+      detectedMaterials: insertScan.detectedMaterials,
+      reasons: insertScan.reasons,
+      isValuable: insertScan.isValuable,
+      lotType: insertScan.lotType ?? 'single',
       price: insertScan.price ?? null,
-      id,
-      scannedAt: new Date(),
-    };
-    this.manualScans.set(id, scan);
-    return scan;
+    } as any).returning();
+    return results[0];
   }
 
   async deleteManualScan(id: string): Promise<boolean> {
-    return this.manualScans.delete(id);
+    const results = await db.delete(manualScans).where(eq(manualScans.id, id)).returning();
+    return results.length > 0;
   }
 }
 
-export const storage = new MemStorage();
+// Export singleton instance
+export const storage = new PostgresStorage();
