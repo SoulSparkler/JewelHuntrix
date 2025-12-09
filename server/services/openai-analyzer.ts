@@ -14,103 +14,110 @@ if (process.env.OPENAI_API_KEY) {
   );
 }
 
-// Zod validation schema for AI responses
-const AnalysisResponseSchema = z.object({
-  isValuable: z.boolean(),
+// Zod validation schema for antique dealer responses
+const AntiqueDealerResponseSchema = z.object({
+  listingUrl: z.string(),
+  isValuableLikely: z.boolean(),
   confidence: z.number().min(0).max(100),
-  detectedMaterials: z.array(z.string()),
-  reasons: z.array(z.string()),
-  lotType: z.enum(['single', 'vintage_lot', 'estate', 'mixed']).default('single')
+  mainMaterialGuess: z.enum(['gold', 'silver', 'pearls', 'diamonds', 'gemstones', 'mixed', 'unknown']),
+  reasons: z.array(z.string())
 });
 
-interface AnalysisResult {
-  isValuable: boolean;
+interface AntiqueDealerAnalysisResult {
+  listingUrl: string;
+  isValuableLikely: boolean;
   confidence: number;
-  detectedMaterials: string[];
+  mainMaterialGuess: 'gold' | 'silver' | 'pearls' | 'diamonds' | 'gemstones' | 'mixed' | 'unknown';
   reasons: string[];
-  lotType: 'single' | 'vintage_lot' | 'estate' | 'mixed';
 }
 
-const ANALYSIS_PROMPT = `You are an expert jewelry appraiser analyzing Vinted listings for hidden valuable items.
+const ANTIQUE_DEALER_PROMPT = `You are a professional antique jewelry dealer and estate lot expert.
 
-ANALYZE the images and text for ALL types of valuable materials:
+Your task is to detect HIDDEN VALUE in undervalued Vinted listings, especially:
+- Vintage jewelry lots
+- Estate lots
+- "Old jewelry box" bundles
+- Mixed costume + real metal pieces
+- Sellers who do NOT recognize what they are selling
 
-=== GOLD DETECTION ===
-Hallmarks: 10K, 14K, 18K, 22K, 24K, 417, 585, 750, 916, 999
-Keywords: solid gold, real gold, genuine gold, oro
-Visual: Rich yellow/rose color, weight appearance, quality wear patterns
+Analyze the listing TITLE, DESCRIPTION, PRICE, and IMAGES.
 
-=== SILVER DETECTION ===
-Hallmarks: 925, Sterling, 900, 800, 835
-Keywords: solid silver, sterling silver, argent
-Visual: Bright metallic luster, natural tarnish patterns
+You are not looking only for obvious solid gold.
+You are looking for:
+- Real GOLD
+- Real SILVER
+- NATURAL PEARLS
+- DIAMONDS
+- PRECIOUS & SEMI-PRECIOUS GEMSTONES
+- RELIGIOUS MEDALS
+- ANTIQUE SIGNED JEWELRY
+- ART NOUVEAU / ART DECO pieces
 
-=== PEARL DETECTION ===
-Types: Natural, Akoya, South Sea, Tahitian, Freshwater
-Visual: Natural luster/orient, irregular surface texture, drill hole quality
-Keywords: real pearls, cultured pearls, genuine pearls
+Think like a flea market treasure hunter.
 
-=== DIAMOND & GEMSTONE DETECTION ===
-Visual: Clarity, cut quality, color depth, light refraction
-Settings: Quality prong work, bezel settings, pave
-Keywords: diamond, ruby, sapphire, emerald, amethyst
+--- VALUE BOOST SIGNALS ---
+Increase confidence if ANY of the following are present:
+- Hallmarks: 925, 800, 835, 585, 750, 18k, 14k
+- Tarnish consistent with real silver
+- Old cut diamonds
+- Baroque or irregular pearls
+- Heavy wear on clasps
+- Religious medals with age patina
+- One valuable item hidden among many cheap ones
+- Seller language like: "old jewelry", "grandma", "estate", "found in drawer", "untested", "don't know"
 
-=== ANTIQUE RELIGIOUS MEDALS ===
-Materials: Gold, silver, bronze
-Indicators: Age patina, detailed craftsmanship, religious iconography
-Keywords: antique medal, religious medal, saint medal, miraculous medal
+--- VALUE RED FLAGS ---
+Decrease confidence if:
+- "plaqué", "doré", "fantaisie", "gold tone"
+- Mass-produced modern fashion jewelry
+- Obvious plastic beads
+- Fully uniform shiny gold color
+- No wear at all on supposedly old items
 
-=== SIGNED VINTAGE DESIGNER ===
-Brands: Trifari, Monet, Napier, Coro, Sarah Coventry, Miriam Haskell
-Indicators: Signature stamps, quality construction, original boxes
-Keywords: signed, designer, vintage, marked
+--- DECISION RULE ---
+If even ONE item in a mixed lot is likely real:
+→ The entire lot becomes a PROFIT OPPORTUNITY.
 
-=== VINTAGE LOT DETECTION ===
-CRITICAL: Look for hidden gems in mixed lots!
-Keywords: estate lot, vintage jewelry lot, old jewelry box, grandma jewelry, bulk jewelry, unsorted
-Strategy: Even ONE valuable piece among costume jewelry = valuable lot
-Look for: Individual hallmarked pieces, real pearls, quality stones hidden in pile
-Visual: Mixed quality items, some with hallmarks, real gems among costume pieces
+Your job is to detect potential resale arbitrage, not to authenticate perfectly.
 
-=== RED FLAGS - Lower Confidence ===
-Keywords: doré, gold tone, gold plated, plaqué, vermeil, fantaisie, costume
-Visual: Green discoloration, peeling, lightweight, mass-produced appearance
+OUTPUT ONLY valid JSON. NO markdown. NO explanations outside the JSON. NO extra text.
 
-OUTPUT ONLY valid JSON:
+Schema:
 {
-  "isValuable": boolean,
-  "confidence": number 0-100,
-  "detectedMaterials": string[],
-  "reasons": string[],
-  "lotType": "single" | "vintage_lot" | "estate" | "mixed"
+  "listingUrl": "string",
+  "isValuableLikely": boolean,
+  "confidence": 0-100,
+  "mainMaterialGuess": "gold | silver | pearls | diamonds | gemstones | mixed | unknown",
+  "reasons": ["string", "string", "string"]
 }
 
-NO extra text. NO markdown. NO comments.`;
+If uncertainty exists but upside is high → still raise confidence.
+You are allowed to be aggressive in opportunity detection.`;
 
 // Parse AI response with validation
-function parseAIResponse(content: string): AnalysisResult {
+function parseAntiqueDealerResponse(content: string, listingUrl: string): AntiqueDealerAnalysisResult {
   try {
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('No JSON found');
     
     const parsed = JSON.parse(jsonMatch[0]);
-    const validated = AnalysisResponseSchema.parse(parsed);
+    const validated = AntiqueDealerResponseSchema.parse(parsed);
     
     return {
-      isValuable: validated.isValuable,
+      listingUrl: validated.listingUrl || listingUrl,
+      isValuableLikely: validated.isValuableLikely,
       confidence: validated.confidence,
-      detectedMaterials: validated.detectedMaterials,
-      reasons: validated.reasons,
-      lotType: validated.lotType
+      mainMaterialGuess: validated.mainMaterialGuess,
+      reasons: validated.reasons
     };
   } catch (error: any) {
     console.warn('AI response validation failed:', error.message);
     return {
-      isValuable: false,
+      listingUrl,
+      isValuableLikely: false,
       confidence: 0,
-      detectedMaterials: [],
-      reasons: ['Analysis failed: ' + error.message],
-      lotType: 'single'
+      mainMaterialGuess: 'unknown',
+      reasons: ['Analysis failed: ' + error.message]
     };
   }
 }
@@ -118,15 +125,16 @@ function parseAIResponse(content: string): AnalysisResult {
 export async function analyzeJewelryImages(
   imageUrls: string[],
   listingTitle: string,
-  listingDescription?: string
-): Promise<AnalysisResult> {
+  listingDescription?: string,
+  listingUrl?: string
+): Promise<AntiqueDealerAnalysisResult> {
   if (!openai) {
     return {
-      isValuable: false,
+      listingUrl: listingUrl || '',
+      isValuableLikely: false,
       confidence: 0,
-      detectedMaterials: [],
-      reasons: ["Image analysis is disabled because OPENAI_API_KEY is not configured."],
-      lotType: 'single'
+      mainMaterialGuess: 'unknown',
+      reasons: ["Image analysis is disabled because OPENAI_API_KEY is not configured."]
     };
   }
 
@@ -134,11 +142,11 @@ export async function analyzeJewelryImages(
 
   if (imageUrls.length === 0) {
     return {
-      isValuable: false,
+      listingUrl: listingUrl || '',
+      isValuableLikely: false,
       confidence: 0,
-      detectedMaterials: [],
-      reasons: ["No images available for analysis"],
-      lotType: 'single'
+      mainMaterialGuess: 'unknown',
+      reasons: ["No images available for analysis"]
     };
   }
 
@@ -147,7 +155,7 @@ export async function analyzeJewelryImages(
       {
         role: "user",
         content: [
-          { type: "text", text: `${ANALYSIS_PROMPT}\n\nListing title: "${listingTitle}"\n\nDescription: "${listingDescription || ''}"` },
+          { type: "text", text: `${ANTIQUE_DEALER_PROMPT}\n\nListing title: "${listingTitle}"\n\nDescription: "${listingDescription || ''}"` },
           ...imageUrls.slice(0, 4).map(url => ({
             type: "image_url",
             image_url: { url, detail: "high" }
@@ -168,15 +176,15 @@ export async function analyzeJewelryImages(
       throw new Error("No response from OpenAI");
     }
 
-    return parseAIResponse(content);
+    return parseAntiqueDealerResponse(content, listingUrl || '');
   } catch (error: any) {
     console.error("Error analyzing with OpenAI:", error.message);
     return {
-      isValuable: false,
+      listingUrl: listingUrl || '',
+      isValuableLikely: false,
       confidence: 0,
-      detectedMaterials: [],
-      reasons: [`Analysis failed: ${error.message}`],
-      lotType: 'single'
+      mainMaterialGuess: 'unknown',
+      reasons: [`Analysis failed: ${error.message}`]
     };
   }
 }

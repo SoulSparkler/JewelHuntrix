@@ -26,18 +26,25 @@ export async function scanSearchQuery(searchQuery: SearchQuery): Promise<number>
 
       console.log(`Analyzing new listing: ${listing.title}`);
       
-      const analysis = await analyzeJewelryImages(listing.imageUrls, listing.title);
+      const analysis = await analyzeJewelryImages(
+        listing.imageUrls,
+        listing.title,
+        listing.description,
+        listing.listingUrl
+      );
 
       await storage.createAnalyzedListing({
         listingId: listing.listingId,
         searchQueryId: searchQuery.id,
         confidenceScore: analysis.confidence,
-        isValuable: analysis.confidence >= searchQuery.confidenceThreshold,
-        lotType: analysis.lotType,
+        isValuable: analysis.isValuableLikely,
+        lotType: 'mixed', // Antique dealer treats all as mixed lots for now
       });
 
-      if (analysis.confidence >= searchQuery.confidenceThreshold && analysis.isValuable) {
+      if (analysis.confidence >= searchQuery.confidenceThreshold && analysis.isValuableLikely) {
         console.log(`✅ Valuable item found! Confidence: ${analysis.confidence}%`);
+        console.log(`💎 Main material: ${analysis.mainMaterialGuess}`);
+        console.log(`🎯 Reasons: ${analysis.reasons.join('; ')}`);
         
         const totalCost = parseFloat(listing.price?.replace(/[€,\s]/g, '') || '0') + 4.0;
         const advice = getBuyAdvice(analysis.confidence, totalCost);
@@ -52,10 +59,10 @@ export async function scanSearchQuery(searchQuery: SearchQuery): Promise<number>
           price: listing.price,
           confidenceScore: analysis.confidence,
           aiReasoning: analysis.reasons.join('; '),
-          detectedMaterials: analysis.detectedMaterials,
+          detectedMaterials: [analysis.mainMaterialGuess], // Convert enum to array
           reasons: analysis.reasons,
-          isValuable: analysis.isValuable,
-          lotType: analysis.lotType,
+          isValuable: analysis.isValuableLikely,
+          lotType: 'mixed', // Antique dealer approach - all lots mixed
           searchQueryId: searchQuery.id,
           telegramSent: false,
           expiresAt,
@@ -66,7 +73,7 @@ export async function scanSearchQuery(searchQuery: SearchQuery): Promise<number>
           listing.listingUrl,
           listing.price,
           analysis.confidence,
-          analysis.detectedMaterials,
+          [analysis.mainMaterialGuess],
           analysis.reasons.join('; '),
           advice
         );
@@ -78,6 +85,9 @@ export async function scanSearchQuery(searchQuery: SearchQuery): Promise<number>
         newFindings++;
       } else {
         console.log(`Item below threshold (${analysis.confidence}%) - not creating finding`);
+        console.log(`❌ isValuableLikely: ${analysis.isValuableLikely}`);
+        console.log(`💭 Main material guess: ${analysis.mainMaterialGuess}`);
+        console.log(`📝 Reasons: ${analysis.reasons.join('; ')}`);
       }
 
       await new Promise(resolve => setTimeout(resolve, 3000));

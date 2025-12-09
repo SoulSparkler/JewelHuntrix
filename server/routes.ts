@@ -142,7 +142,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const analysis = await analyzeJewelryImages(
         listing.imageUrls,
         listing.title,
-        listing.description
+        listing.description,
+        url
       );
 
       const scan = await storage.createManualScan({
@@ -150,23 +151,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         listingTitle: listing.title,
         confidenceScore: analysis.confidence,
         aiReasoning: analysis.reasons.join('; '),
-        detectedMaterials: analysis.detectedMaterials,
+        detectedMaterials: [analysis.mainMaterialGuess],
         reasons: analysis.reasons,
-        isValuable: analysis.isValuable,
-        lotType: analysis.lotType,
+        isValuable: analysis.isValuableLikely,
+        lotType: 'mixed', // Antique dealer approach
         price: listing.price,
       });
 
-      // Always return complete response
+      // Always return complete response (antique dealer format)
       res.json({
-        listingUrl: url,
-        listingTitle: listing.title,
-        price: listing.price,
-        isValuable: analysis.isValuable,
+        listingUrl: analysis.listingUrl,
+        isValuableLikely: analysis.isValuableLikely,
         confidence: analysis.confidence,
-        detectedMaterials: analysis.detectedMaterials || [],
-        reasons: analysis.reasons || [],
-        lotType: analysis.lotType || 'single'
+        mainMaterialGuess: analysis.mainMaterialGuess,
+        reasons: analysis.reasons,
+        listingTitle: listing.title,
+        price: listing.price
       });
     } catch (error: any) {
       res.status(500).json({
