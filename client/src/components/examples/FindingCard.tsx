@@ -6,18 +6,20 @@ export default function FindingCardExample() {
     id: '1',
     listingId: '12345',
     listingUrl: 'https://www.vinted.com/items/12345',
-    listingTitle: 'Vintage Pearl Necklace - Mystery Bundle',
-    price: '€15.00',
-    confidenceScore: 92,
-    aiReasoning: 'Clear 585 hallmark visible on clasp in photo 2. Pearl shows natural luster and irregular surface texture consistent with genuine pearls. Professional craftsmanship evident in setting.',
-    detectedMaterials: ["14K Gold", "Real Pearl"],
-    reasons: ["585 hallmark detected", "Natural pearl luster", "Professional craftsmanship"],
+    listingTitle: 'Vintage Art Deco Gold Ring with Diamonds',
+    price: '€25.00',
+    confidenceScore: 87,
+    aiReasoning: 'Clear 585 hallmark on inner band. Art Deco geometric setting with old mine cut diamonds. Vintage prong construction and patina consistent with 1920s-1930s era.',
+    detectedMaterials: ["gold", "diamonds"],
+    reasons: ["585 hallmark detected", "Art Deco geometric design", "Old mine cut diamonds", "Vintage construction methods"],
     isValuable: true,
-    lotType: 'vintage_lot',
+    lotType: 'mixed',
     searchQueryId: null,
     foundAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
     telegramSent: false,
-    expiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000)
+    expiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+    lastScannedAt: null,
+    scanIntervalMinutes: 90
   };
 
   return (

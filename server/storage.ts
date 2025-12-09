@@ -31,6 +31,7 @@ export interface IStorage {
   // Findings
   getFindings(): Promise<Finding[]>;
   getFinding(id: string): Promise<Finding | undefined>;
+  getFindingByListingUrl(listingUrl: string): Promise<Finding | undefined>;
   createFinding(finding: InsertFinding): Promise<Finding>;
   deleteFinding(id: string): Promise<boolean>;
   deleteExpiredFindings(): Promise<void>;
@@ -110,6 +111,11 @@ export class PostgresStorage implements IStorage {
 
   async getFinding(id: string): Promise<Finding | undefined> {
     const results = await db.select().from(findings).where(eq(findings.id, id));
+    return results[0];
+  }
+
+  async getFindingByListingUrl(listingUrl: string): Promise<Finding | undefined> {
+    const results = await db.select().from(findings).where(eq(findings.listingUrl, listingUrl));
     return results[0];
   }
 

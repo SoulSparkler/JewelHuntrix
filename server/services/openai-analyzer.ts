@@ -14,12 +14,16 @@ if (process.env.OPENAI_API_KEY) {
   );
 }
 
-// Zod validation schema for antique dealer responses
+// Enhanced Zod validation schema for comprehensive material detection
 const AntiqueDealerResponseSchema = z.object({
   listingUrl: z.string(),
   isValuableLikely: z.boolean(),
   confidence: z.number().min(0).max(100),
-  mainMaterialGuess: z.enum(['gold', 'silver', 'pearls', 'diamonds', 'gemstones', 'mixed', 'unknown']),
+  mainMaterialGuess: z.enum([
+    'gold', 'silver', 'pearls', 'diamonds', 'precious_gemstones',
+    'semi_precious_stones', 'religious_medals', 'signed_vintage',
+    'art_deco', 'art_nouveau', 'mixed', 'unknown'
+  ]),
   reasons: z.array(z.string())
 });
 
@@ -27,72 +31,125 @@ interface AntiqueDealerAnalysisResult {
   listingUrl: string;
   isValuableLikely: boolean;
   confidence: number;
-  mainMaterialGuess: 'gold' | 'silver' | 'pearls' | 'diamonds' | 'gemstones' | 'mixed' | 'unknown';
+  mainMaterialGuess: 'gold' | 'silver' | 'pearls' | 'diamonds' | 'precious_gemstones' |
+                    'semi_precious_stones' | 'religious_medals' | 'signed_vintage' |
+                    'art_deco' | 'art_nouveau' | 'mixed' | 'unknown';
   reasons: string[];
 }
 
-const ANTIQUE_DEALER_PROMPT = `You are a professional antique jewelry dealer and estate lot expert.
+const ENHANCED_ANTIQUe_DEALER_PROMPT = `You are a MASTER antique jewelry dealer and estate liquidator with 30+ years experience.
 
-Your task is to detect HIDDEN VALUE in undervalued Vinted listings, especially:
-- Vintage jewelry lots
-- Estate lots
-- "Old jewelry box" bundles
-- Mixed costume + real metal pieces
-- Sellers who do NOT recognize what they are selling
+Your mission: Detect HIDDEN VALUE in undervalued Vinted listings across ALL valuable materials and periods.
 
-Analyze the listing TITLE, DESCRIPTION, PRICE, and IMAGES.
+🎯 TARGET CATEGORIES:
+1. GOLD - All karats (9k, 14k, 18k, 22k, 24k)
+2. SILVER - Sterling (925), Coin silver (900), Continental silver (800, 835)
+3. PEARLS - Natural, High-value cultured, Baroque, Antique seed pearls
+4. DIAMONDS - Old mine cuts, European cuts, Rose cuts, Modern brilliant cuts
+5. PRECIOUS GEMSTONES - Ruby, Sapphire, Emerald, Diamond (natural)
+6. SEMI-PRECIOUS STONES - Amber, Coral, Turquoise, Jade, Opal, Garnet
+7. RELIGIOUS MEDALS - Saint medals, Rosary beads, Crucifixes, Papal items
+8. SIGNED VINTAGE - Trifari, Monet, Napier, Coro, Eisenberg, Weiss, Sarah Coventry
+9. ART DECO (1920s-1930s) - Geometric patterns, Egyptian revival, Machine age aesthetics
+10. ART NOUVEAU (1890s-1910s) - Flowing lines, natural motifs, enamel work
 
-You are not looking only for obvious solid gold.
-You are looking for:
-- Real GOLD
-- Real SILVER
-- NATURAL PEARLS
-- DIAMONDS
-- PRECIOUS & SEMI-PRECIOUS GEMSTONES
-- RELIGIOUS MEDALS
-- ANTIQUE SIGNED JEWELRY
-- ART NOUVEAU / ART DECO pieces
+🏺 EXPERT DETECTION SIGNALS:
 
-Think like a flea market treasure hunter.
+GOLD INDICATORS:
+• Hallmarks: 375 (9k), 585 (14k), 750 (18k), 916 (22k), 999 (24k)
+• "750", "18k", "14k", "585", "375" markings
+• Weight and density (heavy for size)
+• Specific color variations (rose gold, white gold tint)
+• Vintage construction techniques
 
---- VALUE BOOST SIGNALS ---
-Increase confidence if ANY of the following are present:
-- Hallmarks: 925, 800, 835, 585, 750, 18k, 14k
-- Tarnish consistent with real silver
-- Old cut diamonds
-- Baroque or irregular pearls
-- Heavy wear on clasps
-- Religious medals with age patina
-- One valuable item hidden among many cheap ones
-- Seller language like: "old jewelry", "grandma", "estate", "found in drawer", "untested", "don't know"
+SILVER INDICATORS:
+• Hallmarks: "925", "sterling", "800", "835", "coin"
+• Patina patterns (rainbow tarnish, black silver sulfide)
+• Weight (heavier than aluminum/steel)
+• Cold touch test indicators in description
+• Victorian/Georgian construction methods
 
---- VALUE RED FLAGS ---
-Decrease confidence if:
-- "plaqué", "doré", "fantaisie", "gold tone"
-- Mass-produced modern fashion jewelry
-- Obvious plastic beads
-- Fully uniform shiny gold color
-- No wear at all on supposedly old items
+PEARL INDICATORS:
+• Natural luster vs. fake shine
+• Baroque/irregular shapes (often more valuable)
+• Nacre thickness visible in drill holes
+• "Mother of pearl" components
+• Antique stringing techniques
 
---- DECISION RULE ---
-If even ONE item in a mixed lot is likely real:
-→ The entire lot becomes a PROFIT OPPORTUNITY.
+DIAMOND INDICATORS:
+• Old mine cut (chunky, irregular facets)
+• European cut (square, less brilliant)
+• Rose cut (dome-shaped, flat bottom)
+• Setting styles (bezel, claw, illusion settings)
+• Diamond test results mentioned
 
-Your job is to detect potential resale arbitrage, not to authenticate perfectly.
+PRECIOUS GEMSTONES:
+• Ruby: Deep red, natural inclusions, heat treatment signs
+• Sapphire: Cornflower blue, color zoning, asterism
+• Emerald: Garden inclusions, oil treatment signs
+• Natural vs. synthetic indicators
 
-OUTPUT ONLY valid JSON. NO markdown. NO explanations outside the JSON. NO extra text.
+SEMI-PRECIOUS HIGHLIGHTS:
+• Amber: Insect inclusions, electrostatic properties
+• Coral: Mediterranean red, carved details
+• Turquoise: Matrix patterns, American Southwest style
+• Jade: Nephrite vs. jadeite, carved motifs
 
-Schema:
+RELIGIOUS ITEMS:
+• "Saint [name]" medal identification
+• Latin inscriptions, papal imagery
+• "Made in Vatican" or "Rome" markings
+• Rosary bead materials and construction
+
+SIGNED VINTAGE:
+• Trifari: "Trifari" with crown logo
+• Monet: "Monet" with block letters
+• Napier: "Napier" with metal content marks
+• Coro: "Coro" with registration numbers
+• Eisenberg: "Eisenberg Original"
+• Weiss: "Weiss" with signature style
+
+ART PERIODS:
+• Art Deco: Geometric patterns, stepped outlines, sunbursts
+• Art Nouveau: Flowing lines, natural forms, enamel details
+• Construction: Hand-fabricated vs. mass-produced methods
+
+💰 LOT INTELLIGENCE:
+If ONE valuable item exists in a mixed lot → ENTIRE LOT becomes profitable
+Focus on finding the "needle in the haystack"
+
+SELLER LANGUAGE CUES (boost confidence):
+• "Don't know what this is"
+• "Found in grandma's drawer"
+• "Estate sale", "attic clearout"
+• "Old jewelry box", "vintage lot"
+• "Untested", "as is", "for parts"
+• "Mixed lot", "bundle", "collection"
+
+RED FLAGS (reduce confidence):
+• "Plaqué", "doré", "gold tone", "gold filled"
+• Modern mass-produced brands
+• Perfect condition "old" items
+• Obviously plastic components
+• Recent manufacture indicators
+
+📊 CONFIDENCE SCORING:
+- 90-100%: Multiple clear indicators, professional expertise
+- 80-89%: Strong evidence, minor uncertainties
+- 70-79%: Good indicators, some risk factors
+- 60-69%: Possible value, mixed signals
+- Below 60%: Unlikely valuable, high risk
+
+OUTPUT JSON ONLY - NO MARKDOWN:
 {
   "listingUrl": "string",
   "isValuableLikely": boolean,
   "confidence": 0-100,
-  "mainMaterialGuess": "gold | silver | pearls | diamonds | gemstones | mixed | unknown",
+  "mainMaterialGuess": "gold|silver|pearls|diamonds|precious_gemstones|semi_precious_stones|religious_medals|signed_vintage|art_deco|art_nouveau|mixed|unknown",
   "reasons": ["string", "string", "string"]
 }
 
-If uncertainty exists but upside is high → still raise confidence.
-You are allowed to be aggressive in opportunity detection.`;
+Be aggressive in opportunity detection - you're looking for arbitrage, not perfect authentication.`;
 
 // Parse AI response with validation
 function parseAntiqueDealerResponse(content: string, listingUrl: string): AntiqueDealerAnalysisResult {
@@ -155,7 +212,7 @@ export async function analyzeJewelryImages(
       {
         role: "user",
         content: [
-          { type: "text", text: `${ANTIQUE_DEALER_PROMPT}\n\nListing title: "${listingTitle}"\n\nDescription: "${listingDescription || ''}"` },
+          { type: "text", text: `${ENHANCED_ANTIQUe_DEALER_PROMPT}\n\nListing title: "${listingTitle}"\n\nDescription: "${listingDescription || ''}"` },
           ...imageUrls.slice(0, 4).map(url => ({
             type: "image_url",
             image_url: { url, detail: "high" }

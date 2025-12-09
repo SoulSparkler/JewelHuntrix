@@ -5,6 +5,7 @@ import { insertSearchQuerySchema, insertManualScanSchema } from "@shared/schema"
 import { scrapeVintedListing } from "./services/vinted-scraper";
 import { analyzeJewelryImages } from "./services/openai-analyzer";
 import { scanSearchQuery } from "./services/scanner";
+import { sendTelegramAlert } from "./services/telegram";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Search Query Management
@@ -146,6 +147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         url
       );
 
+      // Create manual scan record
       const scan = await storage.createManualScan({
         listingUrl: url,
         listingTitle: listing.title,
@@ -157,6 +159,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lotType: 'mixed', // Antique dealer approach
         price: listing.price,
       });
+
+      // Send Telegram alert if high confidence (>= 75%) and valuable
+      const CONFIDENCE_THRESHOLD = 75;
+      if (analysis.confidence >= CONFIDENCE_THRESHOLD && analysis.isValuableLikely) {
+        console.log(`📱 Manual scan: High-confidence finding detected (${analysis.confidence}%) - sending Telegram alert`);
+        
+        await sendTelegramAlert(
+          listing.title,
+          url,
+          listing.price,
+          analysis.confidence,
+          analysis.mainMaterialGuess,
+          analysis.reasons,
+          analysis.isValuableLikely
+        );
+      } else {
+        console.log(`📱 Manual scan: Below 75% confidence threshold (${analysis.confidence}%) - no Telegram alert`);
+      }
 
       // Always return complete response (antique dealer format)
       res.json({

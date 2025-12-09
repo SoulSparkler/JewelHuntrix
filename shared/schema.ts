@@ -44,6 +44,8 @@ export const findings = pgTable("findings", {
   foundAt: timestamp("found_at").notNull().default(sql`now()`),
   telegramSent: boolean("telegram_sent").notNull().default(false),
   expiresAt: timestamp("expires_at").notNull(),
+  lastScannedAt: timestamp("last_scanned_at"),
+  scanIntervalMinutes: integer("scan_interval_minutes").notNull().default(90),
 });
 
 export const manualScans = pgTable("manual_scans", {
