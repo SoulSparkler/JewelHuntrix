@@ -3,6 +3,7 @@ import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startScheduler } from "./scheduler";
+import { testConnection } from "./db";
 
 const app = express();
 
@@ -82,8 +83,18 @@ app.use((req, res, next) => {
       host: "0.0.0.0",
       reusePort: true,
     },
-    () => {
-      log(`Serving on port ${port}`);
+    async () => {
+      log(`🚀 Serving on port ${port}`);
+      
+      // Test database connection on startup
+      log("🔍 Testing database connection...");
+      const dbConnected = await testConnection();
+      if (!dbConnected) {
+        log("❌ Database connection failed! Data persistence will not work.");
+      } else {
+        log("✅ Database connection successful!");
+      }
+      
       startScheduler();
     }
   );
