@@ -1,4 +1,5 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
+import { cookieManager } from '../utils/cookie-manager';
 
 const USER_AGENTS = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -6,10 +7,6 @@ const USER_AGENTS = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
 ];
-
-// Environment variables for authentication
-const VINTED_SESSION_COOKIE = process.env.VINTED_SESSION_COOKIE;
-const VINTED_AUTH_TOKEN = process.env.VINTED_AUTH_TOKEN;
 
 function getRandomUserAgent(): string {
   return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
@@ -72,16 +69,23 @@ async function setupPage(browser: Browser): Promise<Page> {
     'Upgrade-Insecure-Requests': '1',
   });
 
-  // Set auth cookies if available
-  if (VINTED_SESSION_COOKIE) {
-    await page.setCookie({
-      name: '_vinted_fr_session',
-      value: VINTED_SESSION_COOKIE,
-      domain: '.vinted.nl',
-      path: '/',
-      httpOnly: true,
-      secure: true
-    });
+  // Load persistent session cookies if available
+  const sessionCookies = await cookieManager.loadCookies();
+  if (sessionCookies.length > 0) {
+    await page.setCookie(...sessionCookies);
+    console.log(`🔐 Loaded ${sessionCookies.length} session cookies`);
+  } else {
+    console.warn('⚠️ No session cookies loaded - scraping may be limited');
+  }
+
+  // Set region cookies to prevent location popups
+  const regionCookies = cookieManager.getRegionCookies();
+  for (const cookie of regionCookies) {
+    try {
+      await page.setCookie(cookie);
+    } catch (error) {
+      console.warn(`Could not set region cookie ${cookie.name}:`, error.message);
+    }
   }
 
   // Block unnecessary resources
