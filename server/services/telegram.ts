@@ -108,6 +108,65 @@ ${reasons.map(reason => `   • ${reason}`).join('\n')}
 }
 
 /**
+ * Send a pre-formatted message (used by the new OpenRouter-driven pipeline).
+ * Keeps the per-listing rate limiter / dedupe behaviour.
+ */
+export async function sendTelegramMessage(text: string, dedupeKey?: string): Promise<boolean> {
+  if (!bot || !TELEGRAM_CHAT_ID) {
+    console.warn("Telegram bot not configured - skipping message");
+    return false;
+  }
+  if (dedupeKey && !telegramRateLimiter.canSendAlert(dedupeKey)) {
+    return false;
+  }
+  try {
+    await bot.sendMessage(TELEGRAM_CHAT_ID, text, {
+      parse_mode: "Markdown",
+      disable_web_page_preview: false,
+    });
+    if (dedupeKey) telegramRateLimiter.recordAlert(dedupeKey);
+    return true;
+  } catch (error: any) {
+    console.error("❌ Error sending Telegram message:", error.message);
+    return false;
+  }
+}
+
+/**
+ * Operational alert: a scan failed. Bypasses the listing rate-limiter because
+ * the owner must know when the system is broken (Problem 3 requirement).
+ */
+export async function sendScanFailureAlert(reason: string): Promise<void> {
+  if (!bot || !TELEGRAM_CHAT_ID) return;
+  try {
+    await bot.sendMessage(
+      TELEGRAM_CHAT_ID,
+      `⚠️ *JewelHuntrix scan mislukt*\n\nReden: ${reason}\nTijd: ${new Date().toLocaleString("nl-NL")}`,
+      { parse_mode: "Markdown" },
+    );
+  } catch (error: any) {
+    console.error("❌ Could not send failure alert:", error.message);
+  }
+}
+
+/**
+ * Daily heartbeat: confirms the scanner is alive.
+ */
+export async function sendHealthPing(lastSuccessAt: Date | null, listingsChecked: number): Promise<void> {
+  if (!bot || !TELEGRAM_CHAT_ID) return;
+  const last = lastSuccessAt ? lastSuccessAt.toLocaleString("nl-NL") : "nog geen";
+  try {
+    await bot.sendMessage(
+      TELEGRAM_CHAT_ID,
+      `✅ *JewelHuntrix draait*\n\nLaatste succesvolle run: ${last}\nListings gecheckt (laatste run): ${listingsChecked}`,
+      { parse_mode: "Markdown" },
+    );
+  } catch (error: any) {
+    console.error("❌ Could not send health ping:", error.message);
+  }
+}
+
+/**
  * Get current rate limiting status for monitoring
  */
 export function getRateLimitStatus() {

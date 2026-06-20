@@ -1,10 +1,11 @@
-import { eq, desc, lt, and } from "drizzle-orm";
+import { eq, desc, lt, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
   searchQueries,
   analyzedListings,
   findings,
   manualScans,
+  scanState,
   type SearchQuery,
   type InsertSearchQuery,
   type AnalyzedListing,
@@ -13,6 +14,7 @@ import {
   type InsertFinding,
   type ManualScan,
   type InsertManualScan,
+  type ScanState,
 } from "../shared/schema";
 
 export interface IStorage {
@@ -40,6 +42,12 @@ export interface IStorage {
   getManualScans(): Promise<ManualScan[]>;
   createManualScan(scan: InsertManualScan): Promise<ManualScan>;
   deleteManualScan(id: string): Promise<boolean>;
+
+  // Scan health / retention
+  cleanupOldAnalyzedListings(days: number): Promise<void>;
+  getScanState(): Promise<ScanState | undefined>;
+  markScanStarted(): Promise<void>;
+  markScanFinished(opts: { success: boolean; listingsChecked: number; error?: string }): Promise<void>;
 }
 
 export class PostgresStorage implements IStorage {
@@ -131,6 +139,7 @@ export class PostgresStorage implements IStorage {
       reasons: insertFinding.reasons,
       isValuable: insertFinding.isValuable,
       lotType: insertFinding.lotType ?? 'single',
+      sellerCountry: (insertFinding as any).sellerCountry ?? null,
       searchQueryId: insertFinding.searchQueryId ?? null,
       telegramSent: insertFinding.telegramSent ?? false,
       expiresAt: insertFinding.expiresAt,
@@ -173,6 +182,48 @@ export class PostgresStorage implements IStorage {
   async deleteManualScan(id: string): Promise<boolean> {
     const results = await db.delete(manualScans).where(eq(manualScans.id, id)).returning();
     return results.length > 0;
+  }
+
+  // Scan health / retention
+  async cleanupOldAnalyzedListings(days: number): Promise<void> {
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    await db.delete(analyzedListings).where(lt(analyzedListings.analyzedAt, cutoff));
+  }
+
+  async getScanState(): Promise<ScanState | undefined> {
+    const rows = await db.select().from(scanState).where(eq(scanState.id, "global"));
+    return rows[0];
+  }
+
+  async markScanStarted(): Promise<void> {
+    const now = new Date();
+    await db
+      .insert(scanState)
+      .values({ id: "global", lastRunAt: now, updatedAt: now })
+      .onConflictDoUpdate({ target: scanState.id, set: { lastRunAt: now, updatedAt: now } });
+  }
+
+  async markScanFinished(opts: { success: boolean; listingsChecked: number; error?: string }): Promise<void> {
+    const now = new Date();
+    const base = {
+      lastListingsChecked: opts.listingsChecked,
+      lastError: opts.success ? null : opts.error ?? "unknown error",
+      updatedAt: now,
+    };
+    await db
+      .insert(scanState)
+      .values({
+        id: "global",
+        ...base,
+        lastSuccessAt: opts.success ? now : null,
+        consecutiveFailures: opts.success ? 0 : 1,
+      })
+      .onConflictDoUpdate({
+        target: scanState.id,
+        set: opts.success
+          ? { ...base, lastSuccessAt: now, consecutiveFailures: 0 }
+          : { ...base, consecutiveFailures: sql`${scanState.consecutiveFailures} + 1` },
+      });
   }
 }
 

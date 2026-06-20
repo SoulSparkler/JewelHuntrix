@@ -1,112 +1,88 @@
 import { storage } from "../storage";
-import { scrapeVintedSearch } from "./vinted-scraper";
-import { analyzeJewelryImages } from "./openai-analyzer";
-import { sendTelegramAlert } from "./telegram";
+import { searchListings, getSellerCountry } from "../lib/vinted";
+import { scoreListingImages, generateAlertMessage } from "../lib/openrouter";
+import { sendTelegramMessage } from "./telegram";
 import type { SearchQuery } from "@shared/schema";
 
-export async function scanSearchQuery(searchQuery: SearchQuery): Promise<number> {
-  console.log(`\n=== Starting scan for: ${searchQuery.searchLabel} ===`);
-  
-  try {
-    const listings = await scrapeVintedSearch(searchQuery.vintedUrl);
-    let newFindings = 0;
+// Vision score (1-10) at/above which a listing becomes a Telegram-worthy finding.
+const SCORE_THRESHOLD = parseInt(process.env.VISION_SCORE_THRESHOLD || "7", 10);
 
-    for (const listing of listings) {
-      // Check if listing was already analyzed
-      const existingAnalysis = await storage.getAnalyzedListing(listing.listingId);
-      if (existingAnalysis) {
-        console.log(`Skipping already analyzed listing: ${listing.listingId}`);
-        continue;
-      }
+export interface ScanOutcome {
+  listingsChecked: number;
+  newFindings: number;
+}
 
-      // Check if we already have a finding for this listing URL (deduplication)
-      const existingFinding = await storage.getFindingByListingUrl(listing.listingUrl);
-      if (existingFinding) {
-        console.log(`Skipping listing with existing finding: ${listing.listingUrl}`);
-        continue;
-      }
+export async function scanSearchQuery(searchQuery: SearchQuery): Promise<ScanOutcome> {
+  console.log(`\n=== Scan: ${searchQuery.searchLabel} ===`);
 
-      console.log(`Analyzing new listing: ${listing.title}`);
-      
-      const analysis = await analyzeJewelryImages(
-        listing.imageUrls,
-        listing.title,
-        listing.description,
-        listing.listingUrl
-      );
+  // Note: searchListings throws on auth/block/network errors — the caller
+  // (runScan) catches and records them so failures are never silent.
+  const listings = await searchListings(searchQuery.vintedUrl);
+  let newFindings = 0;
 
-      // Record the analysis
-      await storage.createAnalyzedListing({
-        listingId: listing.listingId,
-        searchQueryId: searchQuery.id,
-        confidenceScore: analysis.confidence,
-        isValuable: analysis.isValuableLikely,
-        lotType: 'mixed', // Antique dealer treats all as mixed lots for now
-      });
+  for (const listing of listings) {
+    // Skip listings we've already analyzed (dedupe across runs).
+    if (await storage.getAnalyzedListing(listing.listingId)) continue;
+    if (await storage.getFindingByListingUrl(listing.listingUrl)) continue;
 
-      // Fixed 75% confidence threshold requirement
-      const CONFIDENCE_THRESHOLD = 75;
-      
-      if (analysis.confidence >= CONFIDENCE_THRESHOLD && analysis.isValuableLikely) {
-        console.log(`✅ High-confidence valuable item found! Confidence: ${analysis.confidence}%`);
-        console.log(`💎 Main material: ${analysis.mainMaterialGuess}`);
-        console.log(`🎯 Reasons: ${analysis.reasons.join('; ')}`);
-        
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 15);
+    const score = await scoreListingImages(listing.imageUrls, listing.title, listing.description);
 
-        // Create the finding
-        const finding = await storage.createFinding({
-          listingId: listing.listingId,
-          listingUrl: listing.listingUrl,
-          listingTitle: listing.title,
-          price: listing.price,
-          confidenceScore: analysis.confidence,
-          aiReasoning: analysis.reasons.join('; '),
-          detectedMaterials: [analysis.mainMaterialGuess],
-          reasons: analysis.reasons,
-          isValuable: analysis.isValuableLikely,
-          lotType: 'mixed', // Antique dealer approach - all lots mixed
-          searchQueryId: searchQuery.id,
-          telegramSent: false,
-          expiresAt,
-        });
+    const isValuable = score.score >= SCORE_THRESHOLD && score.confidence !== "low";
+    const confidencePct = score.score * 10; // keep the dashboard's 0-100 scale
 
-        // Send Telegram alert with new format
-        const sent = await sendTelegramAlert(
-          listing.title,
-          listing.listingUrl,
-          listing.price,
-          analysis.confidence,
-          analysis.mainMaterialGuess,
-          analysis.reasons,
-          analysis.isValuableLikely
-        );
+    await storage.createAnalyzedListing({
+      listingId: listing.listingId,
+      searchQueryId: searchQuery.id,
+      confidenceScore: confidencePct,
+      isValuable,
+      lotType: "mixed",
+    });
 
-        // Update finding record if alert was sent
-        if (sent && finding) {
-          // Note: In a real implementation, you'd update the database here
-          console.log(`📱 Telegram alert successfully sent`);
-        }
-
-        newFindings++;
-      } else {
-        console.log(`Item below 75% confidence threshold (${analysis.confidence}%) - not creating finding`);
-        console.log(`❌ isValuableLikely: ${analysis.isValuableLikely}`);
-        console.log(`💭 Main material guess: ${analysis.mainMaterialGuess}`);
-        console.log(`📝 Reasons: ${analysis.reasons.join('; ')}`);
-      }
-
-      // Rate limiting: wait 3 seconds between requests
-      await new Promise(resolve => setTimeout(resolve, 3000));
+    if (!isValuable) {
+      console.log(`  · ${listing.title.slice(0, 40)} — score ${score.score}/10 (${score.confidence}), skip`);
+      continue;
     }
 
-    await storage.updateLastScanned(searchQuery.id);
-    console.log(`=== Scan complete: ${newFindings} new high-confidence findings ===\n`);
-    
-    return newFindings;
-  } catch (error: any) {
-    console.error(`Error scanning search query ${searchQuery.id}:`, error.message);
-    return 0;
+    // Only now (for the few that pass) do we spend a request to resolve country.
+    const sellerCountry = listing.sellerId ? await getSellerCountry(listing.sellerId) : null;
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 15);
+
+    await storage.createFinding({
+      listingId: listing.listingId,
+      listingUrl: listing.listingUrl,
+      listingTitle: listing.title,
+      price: listing.price,
+      confidenceScore: confidencePct,
+      aiReasoning: score.reasoning,
+      detectedMaterials: score.flags,
+      reasons: [score.reasoning, ...score.flags],
+      isValuable,
+      lotType: "mixed",
+      sellerCountry,
+      searchQueryId: searchQuery.id,
+      telegramSent: false,
+      expiresAt,
+    });
+
+    const message = await generateAlertMessage({
+      title: listing.title,
+      price: listing.price,
+      url: listing.listingUrl,
+      sellerCountry,
+      score,
+    });
+    await sendTelegramMessage(message, listing.listingUrl);
+
+    console.log(`  ✅ FIND: ${listing.title.slice(0, 40)} — score ${score.score}/10, ${sellerCountry || "?"}`);
+    newFindings++;
+
+    // Gentle spacing between AI calls.
+    await new Promise((r) => setTimeout(r, 1500));
   }
+
+  await storage.updateLastScanned(searchQuery.id);
+  console.log(`=== Done: ${listings.length} checked, ${newFindings} new findings ===\n`);
+  return { listingsChecked: listings.length, newFindings };
 }

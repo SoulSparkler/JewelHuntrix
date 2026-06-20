@@ -14,6 +14,7 @@ export default function FindingCardExample() {
     reasons: ["585 hallmark detected", "Art Deco geometric design", "Old mine cut diamonds", "Vintage construction methods"],
     isValuable: true,
     lotType: 'mixed',
+    sellerCountry: 'Nederland',
     searchQueryId: null,
     foundAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
     telegramSent: false,

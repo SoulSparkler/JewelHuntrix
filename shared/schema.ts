@@ -40,12 +40,25 @@ export const findings = pgTable("findings", {
   reasons: jsonb("reasons").notNull().$type<string[]>(),
   isValuable: boolean("is_valuable").notNull().default(false),
   lotType: text("lot_type").notNull().default("single"),
+  sellerCountry: text("seller_country"),
   searchQueryId: varchar("search_query_id").references(() => searchQueries.id),
   foundAt: timestamp("found_at").notNull().default(sql`now()`),
   telegramSent: boolean("telegram_sent").notNull().default(false),
   expiresAt: timestamp("expires_at").notNull(),
   lastScannedAt: timestamp("last_scanned_at"),
   scanIntervalMinutes: integer("scan_interval_minutes").notNull().default(90),
+});
+
+// Tracks scan health for the 24/7 reliability / heartbeat requirement.
+// A single row (id = "global") is upserted after every scan run.
+export const scanState = pgTable("scan_state", {
+  id: varchar("id").primaryKey().default("global"),
+  lastRunAt: timestamp("last_run_at"),
+  lastSuccessAt: timestamp("last_success_at"),
+  lastError: text("last_error"),
+  lastListingsChecked: integer("last_listings_checked").notNull().default(0),
+  consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 
 export const manualScans = pgTable("manual_scans", {
@@ -94,3 +107,5 @@ export type InsertFinding = z.infer<typeof insertFindingSchema>;
 
 export type ManualScan = typeof manualScans.$inferSelect;
 export type InsertManualScan = z.infer<typeof insertManualScanSchema>;
+
+export type ScanState = typeof scanState.$inferSelect;

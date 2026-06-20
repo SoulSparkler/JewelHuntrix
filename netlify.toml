@@ -1,20 +1,36 @@
+# Netlify config — true serverless model.
+#
+# - Frontend (React/Vite) is built from ./client and published from client/dist.
+# - Backend logic runs as serverless Functions in ./netlify/functions
+#   (scan + health-ping are SCHEDULED functions; their cron is set in-file via
+#   `export const config = { schedule }` and can be overridden with env vars).
+#
+# Required env vars (Netlify UI → Site settings → Environment variables):
+#   DATABASE_URL            Postgres POOLED connection string (Supabase pooler / Neon)
+#   OPENROUTER_API_KEY      OpenRouter key
+#   VISION_MODEL_ID         e.g. openai/gpt-4o      (optional, has default)
+#   MESSAGE_MODEL_ID        e.g. openai/gpt-4o-mini (optional, has default)
+#   TELEGRAM_BOT_TOKEN      Telegram bot token
+#   TELEGRAM_CHAT_ID        Telegram chat id
+#   VINTED_BASE_URL         optional, defaults to https://www.vinted.nl  (KEEP NL)
+#   VISION_SCORE_THRESHOLD  optional, default 7
+#   SCAN_CRON / HEALTH_CRON optional cron overrides
+
 [build]
-  base = "client"
-  command = "npm install && npm run build"
-  publish = "dist"
+  command = "npm install && cd client && npm install && npm run build"
+  publish = "client/dist"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
   NPM_FLAGS = "--include=dev"
-  VITE_API_URL = "https://huntrix.onrender.com"
 
-# Proxy API calls in development & build to Render
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["server/**", "shared/**"]
+
+# Route all /api/* calls to the serverless Express wrapper.
 [[redirects]]
   from = "/api/*"
-  to = "https://huntrix.onrender.com/:splat"
+  to = "/.netlify/functions/api/:splat"
   status = 200
   force = true
-
-[[scheduled_functions]]
-  cron = "0 */3 * * *"
-  function = "scan"

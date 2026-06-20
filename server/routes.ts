@@ -2,10 +2,11 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertSearchQuerySchema, insertManualScanSchema } from "@shared/schema";
-import { scrapeVintedListing } from "./services/vinted-scraper";
-import { analyzeJewelryImages } from "./services/openai-analyzer";
+import { getListing } from "./lib/vinted";
+import { scoreListingImages, generateAlertMessage } from "./lib/openrouter";
 import { scanSearchQuery } from "./services/scanner";
-import { sendTelegramAlert } from "./services/telegram";
+import { runScan } from "./services/run-scan";
+import { sendTelegramMessage } from "./services/telegram";
 import { db, testConnection, pool } from "./db";
 import { searchQueries, manualScans, findings } from "@shared/schema";
 import { sql } from "drizzle-orm";
@@ -201,8 +202,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const listing = await scrapeVintedListing(url);
-      
+      const listing = await getListing(url);
+
       if (!listing) {
         return res.status(404).json({
           error: "Could not fetch listing",
@@ -214,53 +215,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const analysis = await analyzeJewelryImages(
-        listing.imageUrls,
-        listing.title,
-        listing.description,
-        url
-      );
+      const score = await scoreListingImages(listing.imageUrls, listing.title, listing.description);
+      const SCORE_THRESHOLD = parseInt(process.env.VISION_SCORE_THRESHOLD || "7", 10);
+      const isValuable = score.score >= SCORE_THRESHOLD && score.confidence !== "low";
+      const confidencePct = score.score * 10;
 
       // Create manual scan record
       const scan = await storage.createManualScan({
         listingUrl: url,
         listingTitle: listing.title,
-        confidenceScore: analysis.confidence,
-        aiReasoning: analysis.reasons.join('; '),
-        detectedMaterials: [analysis.mainMaterialGuess],
-        reasons: analysis.reasons,
-        isValuable: analysis.isValuableLikely,
+        confidenceScore: confidencePct,
+        aiReasoning: score.reasoning,
+        detectedMaterials: score.flags,
+        reasons: [score.reasoning, ...score.flags],
+        isValuable,
         lotType: 'mixed', // Antique dealer approach
         price: listing.price,
       });
-      
-      console.log("✅ Created manual scan:", scan);
 
-      // Send Telegram alert if high confidence (>= 75%) and valuable
-      const CONFIDENCE_THRESHOLD = 75;
-      if (analysis.confidence >= CONFIDENCE_THRESHOLD && analysis.isValuableLikely) {
-        console.log(`📱 Manual scan: High-confidence finding detected (${analysis.confidence}%) - sending Telegram alert`);
-        
-        await sendTelegramAlert(
-          listing.title,
+      console.log("✅ Created manual scan:", scan.id);
+
+      // Send Telegram alert if it passes the vision-score threshold.
+      if (isValuable) {
+        console.log(`📱 Manual scan: candidate (score ${score.score}/10) - sending Telegram alert`);
+        const message = await generateAlertMessage({
+          title: listing.title,
+          price: listing.price,
           url,
-          listing.price,
-          analysis.confidence,
-          analysis.mainMaterialGuess,
-          analysis.reasons,
-          analysis.isValuableLikely
-        );
+          sellerCountry: listing.sellerCountry,
+          score,
+        });
+        await sendTelegramMessage(message, url);
       } else {
-        console.log(`📱 Manual scan: Below 75% confidence threshold (${analysis.confidence}%) - no Telegram alert`);
+        console.log(`📱 Manual scan: score ${score.score}/10 below threshold - no Telegram alert`);
       }
 
-      // Always return complete response (antique dealer format)
+      // Return response (keeps the dashboard's existing field names working).
       res.json({
-        listingUrl: analysis.listingUrl,
-        isValuableLikely: analysis.isValuableLikely,
-        confidence: analysis.confidence,
-        mainMaterialGuess: analysis.mainMaterialGuess,
-        reasons: analysis.reasons,
+        listingUrl: url,
+        isValuableLikely: isValuable,
+        confidence: confidencePct,
+        score: score.score,
+        scoreConfidence: score.confidence,
+        flags: score.flags,
+        reasons: [score.reasoning, ...score.flags],
         listingTitle: listing.title,
         price: listing.price
       });
@@ -304,9 +302,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Health check
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
+  // Health check (now reports real scan state for monitoring)
+  app.get("/api/health", async (req, res) => {
+    try {
+      const state = await storage.getScanState();
+      res.json({
+        status: "ok",
+        lastRunAt: state?.lastRunAt ?? null,
+        lastSuccessAt: state?.lastSuccessAt ?? null,
+        lastListingsChecked: state?.lastListingsChecked ?? 0,
+        consecutiveFailures: state?.consecutiveFailures ?? 0,
+        lastError: state?.lastError ?? null,
+      });
+    } catch (error: any) {
+      res.status(500).json({ status: "error", error: error.message });
+    }
+  });
+
+  // Manual full-scan trigger (same entry point the Netlify cron uses).
+  app.post("/api/scan", async (req, res) => {
+    try {
+      const result = await runScan();
+      res.status(result.ok ? 200 : 500).json(result);
+    } catch (error: any) {
+      res.status(500).json({ ok: false, error: error.message });
+    }
   });
 
   const httpServer = createServer(app);
