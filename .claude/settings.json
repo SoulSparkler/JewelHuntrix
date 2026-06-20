@@ -7,7 +7,7 @@
       "Bash(printf '\\\\n# Secrets\\\\n.env\\\\n.env.local\\\\ndata/\\\\n*.session.json\\\\n')",
       "Bash(grep -E \"^\\\\.env$\")",
       "Bash(npm run *)",
-      "Bash(gh repo *)"
+      "Bash(git rev-list *)"
     ]
   }
 }
