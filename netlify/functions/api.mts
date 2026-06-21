@@ -36,7 +36,7 @@ const handler = serverless(app);
 // serverless-http tries to mutate `body` which is a read-only getter
 // on the web Request API.
 export default async (req: Request) => {
-  const url = new URL(req.url);
+  const url = new URL(req.url, "https://jewelhuntrix.netlify.app");
 
   const headers: Record<string, string> = {};
   req.headers.forEach((value, key) => {

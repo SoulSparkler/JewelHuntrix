@@ -188,8 +188,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
     
     try {
-      const { url } = req.body;
-      
+      const { url } = req.body ?? {};
+
       // Validate URL
       if (!url || !url.includes('vinted')) {
         return res.status(400).json({
@@ -198,6 +198,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           confidence: 0,
           detectedMaterials: [],
           reasons: ['Invalid URL provided'],
+          lotType: 'single'
+        });
+      }
+
+      try {
+        new URL(url);
+      } catch {
+        return res.status(400).json({
+          error: 'Malformed URL',
+          isValuable: false,
+          confidence: 0,
+          detectedMaterials: [],
+          reasons: [`URL is not valid: ${url}`],
           lotType: 'single'
         });
       }
@@ -263,6 +276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         price: listing.price
       });
     } catch (error: any) {
+      console.error("❌ analyze-listing error:", error.message, "| body:", JSON.stringify(req.body), "| stack:", error.stack);
       res.status(500).json({
         error: error.message,
         isValuable: false,
