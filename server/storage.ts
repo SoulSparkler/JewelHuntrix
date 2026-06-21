@@ -113,7 +113,7 @@ export class PostgresStorage implements IStorage {
     const now = new Date();
     return await db.select()
       .from(findings)
-      .where(lt(findings.expiresAt, now))
+      .where(sql`${findings.expiresAt} > ${now}`)
       .orderBy(desc(findings.foundAt));
   }
 

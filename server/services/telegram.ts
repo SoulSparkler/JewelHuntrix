@@ -83,7 +83,7 @@ ${materialEmoji} *Material:* ${mainMaterialGuess}
 *🔍 Analysis Reasons:*
 ${reasons.map(reason => `   • ${reason}`).join('\n')}
 
-*💡 Action:* [VIEW LISTING](${listingUrl}
+*💡 Action:* [VIEW LISTING](${listingUrl})
 
 ---
 *JewelHuntrix* | Powered by AI Treasure Detection
