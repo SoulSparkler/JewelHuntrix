@@ -5,7 +5,7 @@
 // Netlify functions can serve. No code changes to routes.ts needed.
 
 import serverless from "serverless-http";
-import express, { type Request as ExpressRequest, Response, NextFunction } from "express";
+import express, { type Request as ExpressRequest, type Response, type NextFunction } from "express";
 import cors from "cors";
 import { registerRoutes } from "../../server/routes";
 
