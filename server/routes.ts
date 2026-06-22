@@ -1,14 +1,14 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertSearchQuerySchema, insertManualScanSchema } from "@shared/schema";
+import { insertSearchQuerySchema, insertManualScanSchema } from "../shared/schema";
 import { getListing } from "./lib/vinted";
 import { scoreListingImages, generateAlertMessage } from "./lib/openrouter";
 import { scanSearchQuery } from "./services/scanner";
 import { runScan } from "./services/run-scan";
 import { sendTelegramMessage } from "./services/telegram";
 import { db, testConnection, pool } from "./db";
-import { searchQueries, manualScans, findings } from "@shared/schema";
+import { searchQueries, manualScans, findings } from "../shared/schema";
 import { sql } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {

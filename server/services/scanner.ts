@@ -2,7 +2,7 @@ import { storage } from "../storage";
 import { searchListings, getSellerCountry } from "../lib/vinted";
 import { scoreListingImages, generateAlertMessage } from "../lib/openrouter";
 import { sendTelegramMessage } from "./telegram";
-import type { SearchQuery } from "@shared/schema";
+import type { SearchQuery } from "../../shared/schema";
 
 // Vision score (1-10) at/above which a listing becomes a Telegram-worthy finding.
 const SCORE_THRESHOLD = parseInt(process.env.VISION_SCORE_THRESHOLD || "7", 10);
