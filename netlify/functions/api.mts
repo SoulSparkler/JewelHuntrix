@@ -28,7 +28,13 @@ app.use((err: any, _req: ExpressRequest, res: Response, _next: NextFunction) => 
 
 // registerRoutes returns an http.Server but serverless-http only needs the app.
 // We call it once at module scope (reused across warm invocations).
-await registerRoutes(app);
+let initError: string | null = null;
+try {
+  await registerRoutes(app);
+} catch (err: any) {
+  initError = err.message;
+  console.error("❌ api.mts init failed:", err.message, err.stack);
+}
 
 const handler = serverless(app);
 
@@ -36,6 +42,13 @@ const handler = serverless(app);
 // serverless-http tries to mutate `body` which is a read-only getter
 // on the web Request API.
 export default async (req: Request) => {
+  if (initError) {
+    return new Response(JSON.stringify({ error: `Function init failed: ${initError}` }), {
+      status: 500,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
   const url = new URL(req.url, "https://jewelhuntrix.netlify.app");
 
   const headers: Record<string, string> = {};

@@ -3,12 +3,17 @@ import pkg from 'pg';
 const { Pool } = pkg;
 import * as schema from '../shared/schema';
 
+if (!process.env.DATABASE_URL) {
+  console.error('❌ DATABASE_URL is not set!');
+}
+
 // PostgreSQL connection pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 5000,
+  ssl: process.env.DATABASE_URL?.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined,
 });
 
 // Handle pool errors
@@ -16,7 +21,6 @@ pool.on('error', (err) => {
   console.error('Unexpected error on idle PostgreSQL client', err);
 });
 
-// Create Drizzle ORM instance
 export const db = drizzle(pool, { schema });
 
 // Export pool for direct queries if needed
