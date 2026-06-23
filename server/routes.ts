@@ -16,7 +16,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/db-health", async (req, res) => {
     try {
       console.log("🔍 Running database health check...");
-      
+
+      // Non-secret diagnostics about the configured DATABASE_URL so we can spot
+      // a malformed env var (quotes / whitespace / wrong protocol) remotely
+      // without ever exposing the credentials.
+      const rawUrl = process.env.DATABASE_URL;
+      let urlDiag: Record<string, any> = { set: !!rawUrl };
+      if (rawUrl) {
+        const trimmed = rawUrl.trim();
+        const unquoted = (/^".*"$/.test(trimmed) || /^'.*'$/.test(trimmed)) ? trimmed.slice(1, -1).trim() : trimmed;
+        let parseOk = false;
+        let host: string | null = null;
+        let protocol: string | null = null;
+        try { const u = new URL(unquoted); parseOk = true; host = u.hostname; protocol = u.protocol; } catch {}
+        urlDiag = {
+          set: true,
+          length: rawUrl.length,
+          hadSurroundingQuotes: unquoted !== trimmed,
+          hadOuterWhitespace: trimmed !== rawUrl,
+          protocol,
+          host,
+          parseOk,
+        };
+      }
+
       // Test basic connection
       const connectionTest = await testConnection();
       
@@ -60,6 +83,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         status: "ok",
+        databaseUrl: urlDiag,
         connection: connectionTest,
         tables: tableInfo,
         operations: operationTest,
