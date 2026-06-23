@@ -52,7 +52,7 @@ export function ScanResultCard({ finding, onDelete }: ScanResultCardProps) {
 
       <div className="mt-3">
         <div className="flex justify-between text-sm">
-          <span>Confidence Score</span>
+          <span>Likely precious (real gold/pearls/gems)</span>
           <span>{finding.confidenceScore}%</span>
         </div>
         <Progress value={finding.confidenceScore} className="h-2 mt-1" />
@@ -74,26 +74,26 @@ export function ScanResultCard({ finding, onDelete }: ScanResultCardProps) {
         </div>
       )}
 
-      {/* Display detected materials as badges */}
-      <div className="mt-3">
-        <p className="text-sm font-medium mb-1">Detected Materials</p>
-        <div className="flex gap-2 flex-wrap">
-          {finding.detectedMaterials?.map((m: string) => (
-            <span key={m} className="bg-amber-600 px-2 py-1 rounded text-xs">
-              {m}
-            </span>
-          )) || <span className="text-gray-400 text-sm">No materials detected</span>}
+      {/* Key tells / flags as badges */}
+      {finding.detectedMaterials && finding.detectedMaterials.length > 0 && (
+        <div className="mt-3">
+          <p className="text-sm font-medium mb-1">Key Tells</p>
+          <div className="flex gap-2 flex-wrap">
+            {finding.detectedMaterials.map((m: string, i: number) => (
+              <span key={`${m}-${i}`} className="bg-amber-600 px-2 py-1 rounded text-xs">
+                {m}
+              </span>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Display reasons as list */}
+      {/* Full expert breakdown (long-form analysis stored in aiReasoning) */}
       <div className="mt-4 border-t border-gray-700 pt-3">
-        <p className="font-medium text-sm mb-2">AI Reasoning:</p>
-        <ul className="list-disc list-inside text-sm text-gray-300 space-y-1">
-          {finding.reasons?.map((reason: string, i: number) => (
-            <li key={i}>{reason}</li>
-          )) || <li>No reasoning provided</li>}
-        </ul>
+        <p className="font-medium text-sm mb-2">Expert Analysis</p>
+        <div className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">
+          {finding.aiReasoning || "No analysis provided"}
+        </div>
       </div>
 
       <div className="mt-4 text-sm">

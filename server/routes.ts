@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertSearchQuerySchema, insertManualScanSchema } from "../shared/schema";
 import { getListing } from "./lib/vinted";
-import { scoreListingImages, generateAlertMessage } from "./lib/openrouter";
+import { scoreListingImages, analyzeListingDetailed, generateAlertMessage } from "./lib/openrouter";
 import { scanSearchQuery } from "./services/scanner";
 import { runScan } from "./services/run-scan";
 import { sendTelegramMessage } from "./services/telegram";
@@ -228,19 +228,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const score = await scoreListingImages(listing.imageUrls, listing.title, listing.description);
+      // Manual scans get the strong, apprentice-teaching deep analysis (not the
+      // cheap bulk pre-filter). The long-form write-up is stored in aiReasoning.
+      const detail = await analyzeListingDetailed(listing.imageUrls, listing.title, listing.description);
       const SCORE_THRESHOLD = parseInt(process.env.VISION_SCORE_THRESHOLD || "7", 10);
-      const isValuable = score.score >= SCORE_THRESHOLD && score.confidence !== "low";
-      const confidencePct = score.score * 10;
+      const isValuable = detail.score >= SCORE_THRESHOLD && detail.confidence !== "low";
+      // Confidence shown in the UI = certainty it contains REAL precious materials.
+      const confidencePct = detail.certaintyPreciousPct;
 
       // Create manual scan record
       const scan = await storage.createManualScan({
         listingUrl: url,
         listingTitle: listing.title,
         confidenceScore: confidencePct,
-        aiReasoning: score.reasoning,
-        detectedMaterials: score.flags,
-        reasons: [score.reasoning, ...score.flags],
+        aiReasoning: detail.analysis,
+        detectedMaterials: detail.flags,
+        reasons: detail.flags,
         isValuable,
         lotType: 'mixed', // Antique dealer approach
         price: listing.price,
@@ -248,19 +251,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("✅ Created manual scan:", scan.id);
 
-      // Send Telegram alert if it passes the vision-score threshold.
+      // Send Telegram alert if it passes the threshold.
       if (isValuable) {
-        console.log(`📱 Manual scan: candidate (score ${score.score}/10) - sending Telegram alert`);
+        console.log(`📱 Manual scan: candidate (score ${detail.score}/10) - sending Telegram alert`);
         const message = await generateAlertMessage({
           title: listing.title,
           price: listing.price,
           url,
           sellerCountry: listing.sellerCountry,
-          score,
+          score: { score: detail.score, reasoning: detail.analysis, flags: detail.flags, confidence: detail.confidence },
         });
         await sendTelegramMessage(message, url);
       } else {
-        console.log(`📱 Manual scan: score ${score.score}/10 below threshold - no Telegram alert`);
+        console.log(`📱 Manual scan: score ${detail.score}/10 below threshold - no Telegram alert`);
       }
 
       // Return response (keeps the dashboard's existing field names working).
@@ -268,10 +271,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         listingUrl: url,
         isValuableLikely: isValuable,
         confidence: confidencePct,
-        score: score.score,
-        scoreConfidence: score.confidence,
-        flags: score.flags,
-        reasons: [score.reasoning, ...score.flags],
+        certaintyPreciousPct: detail.certaintyPreciousPct,
+        score: detail.score,
+        scoreConfidence: detail.confidence,
+        flags: detail.flags,
+        analysis: detail.analysis,
+        reasons: detail.flags,
         listingTitle: listing.title,
         price: listing.price
       });
