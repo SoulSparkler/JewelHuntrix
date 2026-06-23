@@ -18,7 +18,7 @@ import { z } from "zod";
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-const VISION_MODEL_ID = process.env.VISION_MODEL_ID || "openai/gpt-4o";
+const VISION_MODEL_ID = process.env.VISION_MODEL_ID || "google/gemini-2.5-flash-lite";
 const MESSAGE_MODEL_ID = process.env.MESSAGE_MODEL_ID || "openai/gpt-4o-mini";
 
 // Optional per-1M-token price overrides for cost logging (USD). These are only
