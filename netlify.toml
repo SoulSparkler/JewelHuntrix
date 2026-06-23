@@ -34,3 +34,11 @@
   to = "/.netlify/functions/api/:splat"
   status = 200
   force = true
+
+# SPA fallback: serve the built index.html for any client-side route
+# (/searches, /findings, /manual-scan, …) so a hard refresh / deep link
+# doesn't 404. Must come AFTER the /api/* rule above.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
