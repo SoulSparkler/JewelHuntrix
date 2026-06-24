@@ -65,6 +65,40 @@ Output a JSON object ONLY, no markdown, with exactly this shape:
 
 Be honest about uncertainty. If photos are too poor to judge, say so and use low confidence. You are a filter that surfaces candidates, never the final word.`;
 
+/**
+ * Download an image and return a base64 data URI.
+ * Vinted CDN URLs are signed and often return 404 when fetched by external
+ * services (like OpenRouter). By downloading server-side first we avoid that.
+ */
+async function imageToDataUri(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "image/webp,image/apng,image/*,*/*;q=0.8",
+        Referer: "https://www.vinted.nl/",
+      },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    const contentType = res.headers.get("content-type") || "image/jpeg";
+    return `data:${contentType};base64,${buf.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveImageContents(
+  urls: string[],
+): Promise<Array<{ type: "image_url"; image_url: { url: string } }>> {
+  const results = await Promise.all(urls.map(imageToDataUri));
+  return results
+    .filter((uri): uri is string => uri !== null)
+    .map((uri) => ({ type: "image_url" as const, image_url: { url: uri } }));
+}
+
 interface UsageLog {
   model: string;
   promptTokens: number;
@@ -124,13 +158,18 @@ export async function scoreListingImages(
     return { score: 1, reasoning: "No images available to assess.", flags: ["no-images"], confidence: "low" };
   }
   try {
+    const imageContents = await resolveImageContents(imageUrls.slice(0, 4));
+    if (imageContents.length === 0) {
+      return { score: 1, reasoning: "Could not download any listing images.", flags: ["image-download-failed"], confidence: "low" };
+    }
+
     const messages = [
       { role: "system", content: VISION_SYSTEM_PROMPT },
       {
         role: "user",
         content: [
           { type: "text", text: `Listing title: "${title}"\nDescription: "${description}"\nScore the photos.` },
-          ...imageUrls.slice(0, 4).map((url) => ({ type: "image_url", image_url: { url } })),
+          ...imageContents,
         ],
       },
     ];
@@ -219,6 +258,17 @@ export async function analyzeListingDetailed(
     };
   }
   try {
+    const imageContents = await resolveImageContents(imageUrls.slice(0, 6));
+    if (imageContents.length === 0) {
+      return {
+        score: 1,
+        confidence: "low",
+        certaintyPreciousPct: 0,
+        flags: ["image-download-failed"],
+        analysis: "Could not download any listing images from Vinted. The CDN may have blocked the request.",
+      };
+    }
+
     const messages = [
       { role: "system", content: DETAIL_SYSTEM_PROMPT },
       {
@@ -228,7 +278,7 @@ export async function analyzeListingDetailed(
             type: "text",
             text: `Listing title: "${title}"\nDescription: "${description}"\nHere are the listing photos (front and, where present, back views). Give your full apprentice-teaching breakdown and certainty estimate.`,
           },
-          ...imageUrls.slice(0, 6).map((url) => ({ type: "image_url", image_url: { url } })),
+          ...imageContents,
         ],
       },
     ];

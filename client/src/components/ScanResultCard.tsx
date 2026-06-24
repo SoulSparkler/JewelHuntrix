@@ -13,9 +13,11 @@ type ScanResultCardProps = {
 
 export function ScanResultCard({ finding, onDelete }: ScanResultCardProps) {
   const hallmarkInfo = hallmarkToPurity(finding.aiReasoning);
-  const totalCost = parseFloat(finding.price?.replace(/[€,\s]/g, '') || '0') + 4;
+  const parsedPrice = parseFloat(finding.price?.replace(/[€,\s]/g, '') || '');
+  const hasPrice = !isNaN(parsedPrice);
+  const totalCost = hasPrice ? parsedPrice + 4 : NaN;
   const advice =
-    finding.confidenceScore >= 80 && totalCost <= 20
+    finding.confidenceScore >= 80 && hasPrice && totalCost <= 20
       ? "BUY"
       : finding.confidenceScore >= 60
       ? "MAYBE"
@@ -104,7 +106,7 @@ export function ScanResultCard({ finding, onDelete }: ScanResultCardProps) {
           <span className="opacity-70">Shipping:</span> €4.00
         </p>
         <p className="font-semibold">
-          Total: €{totalCost.toFixed(2)}
+          Total: {hasPrice ? `€${totalCost.toFixed(2)}` : "—"}
         </p>
       </div>
 

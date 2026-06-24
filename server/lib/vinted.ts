@@ -172,7 +172,23 @@ export async function getListing(listingUrl: string): Promise<VintedListing | nu
 
     const idMatch = listingUrl.match(/\/items\/(\d+)/);
     const title = meta("og:title") || "Onbekende titel";
-    const priceAmount = meta("product:price:amount");
+    let priceAmount = meta("product:price:amount");
+
+    if (!priceAmount) {
+      const jsonLdMatch = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+      if (jsonLdMatch) {
+        try {
+          const ld = JSON.parse(jsonLdMatch[1]);
+          const offer = ld?.offers ?? ld;
+          if (offer?.price) priceAmount = String(offer.price);
+        } catch {}
+      }
+    }
+    if (!priceAmount) {
+      const pricePat = html.match(/"price"\s*:\s*{\s*"amount"\s*:\s*"?([\d.]+)"?/);
+      if (pricePat) priceAmount = pricePat[1];
+    }
+
     const ogImage = meta("og:image");
 
     // Collect gallery images from the embedded JSON if present.

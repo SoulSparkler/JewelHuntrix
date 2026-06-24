@@ -21,12 +21,13 @@ import { useState } from "react";
 interface AddSearchDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { url: string; frequency: number; threshold: number }) => void;
-  editData?: { url: string; frequency: number; threshold: number } | null;
+  onSubmit: (data: { url: string; label: string; frequency: number; threshold: number }) => void;
+  editData?: { url: string; label?: string; frequency: number; threshold: number } | null;
 }
 
 export default function AddSearchDialog({ open, onOpenChange, onSubmit, editData }: AddSearchDialogProps) {
   const [url, setUrl] = useState(editData?.url || "");
+  const [label, setLabel] = useState(editData?.label || "");
   const [frequency, setFrequency] = useState(editData?.frequency?.toString() || "3");
   const [threshold, setThreshold] = useState(editData?.threshold?.toString() || "80");
 
@@ -34,10 +35,12 @@ export default function AddSearchDialog({ open, onOpenChange, onSubmit, editData
     e.preventDefault();
     onSubmit({
       url,
+      label: label.trim(),
       frequency: parseInt(frequency),
       threshold: parseInt(threshold)
     });
     setUrl("");
+    setLabel("");
     setFrequency("3");
     setThreshold("80");
     onOpenChange(false);
@@ -55,6 +58,20 @@ export default function AddSearchDialog({ open, onOpenChange, onSubmit, editData
           </DialogHeader>
           
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="search-label">Search Name</Label>
+              <Input
+                id="search-label"
+                placeholder="e.g. Gold brooches, Silver rings, Estate lots"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                data-testid="input-search-label"
+              />
+              <p className="text-xs text-muted-foreground">
+                Give this search a recognizable name (optional — defaults to the search text)
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="search-url">Vinted Search URL</Label>
               <Input

@@ -40,11 +40,12 @@ export default function SearchQueries() {
   });
 
   const createSearchMutation = useMutation({
-    mutationFn: (data: { url: string; frequency: number; threshold: number }) => {
-      const label = new URL(data.url).searchParams.get("search_text") || "Custom Search";
+    mutationFn: (data: { url: string; label: string; frequency: number; threshold: number }) => {
+      let fallbackLabel = "Custom Search";
+      try { fallbackLabel = new URL(data.url).searchParams.get("search_text") || fallbackLabel; } catch {}
       return apiRequest("POST", "/api/searches", {
         vintedUrl: data.url,
-        searchLabel: label,
+        searchLabel: data.label || fallbackLabel,
         scanFrequencyHours: data.frequency,
         confidenceThreshold: data.threshold,
         isActive: true,
