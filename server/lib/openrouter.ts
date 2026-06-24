@@ -99,6 +99,43 @@ async function resolveImageContents(
     .map((uri) => ({ type: "image_url" as const, image_url: { url: uri } }));
 }
 
+/**
+ * Extract a JSON object from an AI response that may contain markdown fences,
+ * preamble text, or other wrapping. Tries increasingly aggressive strategies.
+ */
+function extractJson(raw: string): Record<string, any> {
+  // Strip markdown code fences if present
+  let cleaned = raw.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
+
+  // Strategy 1: direct parse (model returned clean JSON)
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (typeof parsed === "object" && parsed !== null) return parsed;
+  } catch {}
+
+  // Strategy 2: greedy regex from first { to last }
+  const m = cleaned.match(/\{[\s\S]*\}/);
+  if (m) {
+    try { return JSON.parse(m[0]); } catch {}
+  }
+
+  // Strategy 3: find balanced braces (handles stray text after the object)
+  const start = cleaned.indexOf("{");
+  if (start !== -1) {
+    let depth = 0;
+    for (let i = start; i < cleaned.length; i++) {
+      if (cleaned[i] === "{") depth++;
+      else if (cleaned[i] === "}") depth--;
+      if (depth === 0) {
+        try { return JSON.parse(cleaned.slice(start, i + 1)); } catch {}
+        break;
+      }
+    }
+  }
+
+  throw new Error("No valid JSON found in AI response");
+}
+
 interface UsageLog {
   model: string;
   promptTokens: number;
@@ -179,9 +216,12 @@ export async function scoreListingImages(
     logUsage("vision", { ...cost, model: VISION_MODEL_ID });
 
     const content: string = data.choices?.[0]?.message?.content ?? "";
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON in vision response");
-    return VisionScoreSchema.parse(JSON.parse(jsonMatch[0]));
+    try {
+      return VisionScoreSchema.parse(extractJson(content));
+    } catch (parseErr: any) {
+      console.warn(`⚠️ Vision JSON parse failed. Raw response (first 500 chars):\n${content.slice(0, 500)}`);
+      throw parseErr;
+    }
   } catch (err: any) {
     console.warn(`⚠️ Vision scoring failed: ${err.message}`);
     return { score: 1, reasoning: `Scoring failed: ${err.message}`, flags: ["error"], confidence: "low" };
@@ -283,14 +323,17 @@ export async function analyzeListingDetailed(
       },
     ];
 
-    const data = await callOpenRouter(DETAIL_MODEL_ID, messages, 1800);
+    const data = await callOpenRouter(DETAIL_MODEL_ID, messages, 3000);
     const cost = estimateCost(data.usage, VISION_PRICE_IN, VISION_PRICE_OUT);
     logUsage("detail", { ...cost, model: DETAIL_MODEL_ID });
 
     const content: string = data.choices?.[0]?.message?.content ?? "";
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON in detailed analysis response");
-    return DetailedAnalysisSchema.parse(JSON.parse(jsonMatch[0]));
+    try {
+      return DetailedAnalysisSchema.parse(extractJson(content));
+    } catch (parseErr: any) {
+      console.warn(`⚠️ Detail JSON parse failed. Raw response (first 800 chars):\n${content.slice(0, 800)}`);
+      throw parseErr;
+    }
   } catch (err: any) {
     console.warn(`⚠️ Detailed analysis failed: ${err.message}`);
     return {
