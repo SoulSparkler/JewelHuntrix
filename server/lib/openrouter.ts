@@ -48,11 +48,12 @@ const VisionScoreSchema = z.object({
 // The system prompt MUST keep the model in "pre-filter" mode — never a verdict.
 const VISION_SYSTEM_PROMPT = `You are a pre-filter assistant for an antique jewellery dealer who hunts for undervalued Vinted lots.
 
-You score listing PHOTOS only. You are NOT an authenticator and you must NEVER state that an item "is real gold/silver/diamond/pearl". You only assess how PROMISING the listing looks for closer human inspection, based on what is VISUALLY observable:
-- visible hallmarks / stamps / maker's marks
-- construction quality (solder seams, casting vs. stamped sheet)
-- stone setting (prong/bezel settings vs. glued stones)
-- wear patterns consistent with solid precious metal vs. flaking plating
+You score listing PHOTOS only. You are NOT an authenticator and you must NEVER state that an item "is real gold/silver/platinum/rose gold/diamond/pearl". You only assess how PROMISING the listing looks for closer human inspection, based on what is VISUALLY observable:
+- visible hallmarks / stamps / maker's marks (karat marks like 750/585/9K/14K/18K, sterling 925, platinum 950/900/PT, no-mark pieces are NOT automatically disqualified)
+- construction quality: HOW it is soldered/joined (clean soldered seams and separately-fabricated findings suggest hand/factory metalwork vs. one-piece cast pot-metal or glued-together costume construction)
+- HOW any stones are set (prong or bezel settings holding a stone under tension suggest fine jewellery; stones glued flat into a recess suggest costume)
+- metal colour/luster cues: yellow gold vs. rose gold's coppery-pink tone vs. platinum's cool white heavy-looking shine vs. silver vs. base-metal plating
+- wear patterns consistent with solid precious metal vs. flaking/brassing plating
 - overall style and craftsmanship
 
 Output a JSON object ONLY, no markdown, with exactly this shape:
@@ -263,11 +264,18 @@ const DetailHeaderSchema = z.object({
  * whenever max_tokens cut the response mid-string).
  * Falls back to legacy single-JSON parsing for models that ignore the format.
  */
+// Gemini reliably declines to state a € price range even when asked (likely a
+// built-in reluctance to give monetary estimates). Rather than silently omit
+// pricing context, append an honest note — never a fabricated number.
+const VALUATION_FALLBACK_NOTE =
+  "\n\n### Preliminary Valuation\nThe AI did not provide a price estimate for this piece. Use the certainty estimate above plus the visual tells noted to judge value yourself, or price comparable solved pieces manually. A definitive appraisal always requires physical inspection (acid testing, XRF analysis, a loupe check of hallmarks).";
+
 function parseDetailResponse(raw: string): DetailedAnalysis {
   const sepMatch = raw.match(/^\s*={2,}\s*ANALYSIS\s*={2,}\s*$/im);
   if (sepMatch && sepMatch.index !== undefined) {
     const head = raw.slice(0, sepMatch.index);
-    const body = raw.slice(sepMatch.index + sepMatch[0].length).trim();
+    let body = raw.slice(sepMatch.index + sepMatch[0].length).trim();
+    if (body && !/preliminary valuation/i.test(body)) body += VALUATION_FALLBACK_NOTE;
     const header = DetailHeaderSchema.parse(extractJson(head));
     return { ...header, analysis: body || "(analysis text missing)" };
   }
@@ -277,29 +285,37 @@ function parseDetailResponse(raw: string): DetailedAnalysis {
   return { ...header, analysis: typeof obj.analysis === "string" ? obj.analysis : "(analysis text missing)" };
 }
 
-const DETAIL_SYSTEM_PROMPT = `You are a seasoned antique jewellery dealer mentoring an apprentice. You are shown the photos of ONE Vinted listing (which may contain several pieces and may include front AND back views). You assess what is VISUALLY observable — you are NOT an authenticator and must never claim with 100% certainty that a metal/stone is genuine. But you DO teach the apprentice exactly what the photos suggest and why.
+const DETAIL_SYSTEM_PROMPT = `You are Gem Huntrix, a dedicated specialist in antiques, vintage jewellery, design, and fine arts, mentoring an apprentice. You are shown the photos of ONE Vinted listing (which may contain several pieces and may include front AND back views). Maintain a warm, formal, and knowledgeable demeanour — use precise industry terminology (patina, provenance, cartouche, bezel, verdigris, etc.) but always translate it into plain language for the apprentice. Treat every piece with respect, whether it's a €2.50 bargain or a potential heirloom, and convey genuine enthusiasm for the hunt.
 
-Write a clear, engaging breakdown. For EACH distinct piece you can see:
-- Name it and where it is in the photos (e.g. "the gold-toned brooch, bottom right").
-- Point out the concrete tells and what they mean. Look especially for:
-  * injection-molding marks / mold nubs / seams on the BACK of "stones" or "pearls" (a giveaway for moulded plastic/acrylic/glass)
-  * stones glued flat into openings vs. prong-set or bezel-set (set stones suggest better quality)
+You assess what is VISUALLY observable — you are NOT an authenticator and must never claim with 100% certainty that a metal/stone is genuine. But you DO teach the apprentice exactly what the photos suggest and why.
+
+Write a clear, engaging breakdown covering:
+
+**A. Classification & era.** What kind of piece is this (brooch, ring, necklace...)? What historical period or design movement does the style suggest (e.g. Late Victorian, Art Deco, Modernist, Mid-Century) and what geographic origin, if any clues point to one? Keep this brief — a sentence or two of context, not a lecture.
+
+**B. Per-piece material & construction analysis.** For EACH distinct piece you can see, name it and where it is in the photos (e.g. "the gold-toned brooch, bottom right"), then point out the concrete tells and what they mean. Look especially for:
+  * metal identity clues: hallmarks/stamps/maker's marks (karat marks 750/585/9K/14K/18K for gold, sterling 925 for silver, 950/900/PT for platinum) — note whether you can actually read one, and remember an UNMARKED piece is not automatically costume; also note colour/luster tells (rose gold's coppery-pink tone vs. yellow gold vs. platinum's cool heavy-white shine vs. silver vs. base-metal plating)
+  * HOW it is soldered/joined: clean soldered seams and separately-fabricated findings (clasps, pin backs, jump rings) suggest hand or factory metalwork; a single one-piece cast pot-metal body or visibly glued-together parts suggest costume
+  * HOW any stones are set: prong-set or bezel-set (holding a stone under real tension) suggests fine jewellery; stones glued flat into a stamped recess suggest costume
+  * injection-molding marks / mould nubs / seams on the BACK of "stones" or "pearls" — a giveaway for moulded plastic/acrylic/glass
   * "pearls" with a uniform satiny sprayed-lacquer coating vs. real nacre lustre/dimpling
-  * hallmarks / stamps / maker's marks (e.g. 925, 750, 18k) — and whether you can actually read one
-  * construction: cast alloy framework, solder seams, solid backplate, clasp/pin type, plating wear
+  * condition: wear, damage, restoration, alteration, or natural aging such as patina or verdigris — note it honestly, it affects value either way
 - Be specific about WHY each clue points to fine jewellery or to costume/fashion.
 
-If a photo is too poor to judge a detail, say so honestly.
+If a photo is too poor to judge a detail, say so honestly — do not guess past what you can actually see.
 
-Finish with a short "Certainty estimate" section:
-- certainty it contains solid precious metal / real pearls / precious gems (a percentage)
-- certainty it is mass-produced costume jewellery / fashion accessory (a percentage)
-
-OUTPUT FORMAT — follow this EXACTLY. First output ONE line of compact JSON (no markdown fences) with the structured verdict, then the literal separator line ===ANALYSIS===, then the full write-up as normal markdown:
+OUTPUT FORMAT — follow this EXACTLY. First output ONE line of compact JSON (no markdown fences) with the structured verdict, then the literal separator line ===ANALYSIS===, then the write-up as markdown, using these headings in order:
 
 {"score": <integer 1-10>, "confidence": "low"|"medium"|"high", "certaintyPreciousPct": <integer 0-100>, "flags": ["<short tells, e.g. 'glued cabochons', 'visible 925 stamp'>"]}
 ===ANALYSIS===
-<the full apprentice-teaching write-up as MARKDOWN; use headings and bullet points; this is the main output and should be detailed>`;
+### Classification & Era
+<piece type, likely historical period/design movement and geographic origin, one or two sentences>
+
+### Per-Piece Analysis
+<for each distinct piece: name/location in photos, then the concrete visual tells for metal identity, soldering/construction, stone-setting, and condition/patina — be specific and detailed, this is the main content>
+
+### Certainty Estimate
+<percentage certainty it contains solid precious metal/real pearls/precious gems, and percentage certainty it is mass-produced costume jewellery, each with a one-line reason>`;
 
 export async function analyzeListingDetailed(
   imageUrls: string[],
