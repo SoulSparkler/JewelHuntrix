@@ -31,11 +31,14 @@ export async function runScan(): Promise<{ ok: boolean; partial: boolean; listin
   try {
     const searches = (await storage.getSearchQueries()).filter((s) => s.isActive);
 
-    for (const search of searches) {
+    for (const [i, search] of searches.entries()) {
       if (Date.now() + 10_000 > deadline) {
         partial = true;
         break;
       }
+      // Gentle spacing between separate Vinted catalog sessions (each one mints
+      // a fresh anonymous token) so requests don't cluster at the same instant.
+      if (i > 0) await new Promise((r) => setTimeout(r, 800 + Math.random() * 1200));
       try {
         const outcome = await scanSearchQuery(search, deadline);
         listingsChecked += outcome.listingsChecked;
