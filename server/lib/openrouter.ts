@@ -165,7 +165,7 @@ async function callOpenRouter(model: string, messages: any[], maxTokens: number)
     headers: {
       Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": process.env.OPENROUTER_REFERRER || "https://jewelhuntrix.netlify.app",
+      "HTTP-Referer": process.env.OPENROUTER_REFERRER || "https://treasurehuntrix.netlify.app",
       "X-Title": "JewelHuntrix",
     },
     body: JSON.stringify({
@@ -248,13 +248,34 @@ export interface DetailedAnalysis {
   analysis: string; // long-form markdown write-up (the Gemini-style breakdown)
 }
 
-const DetailedAnalysisSchema = z.object({
+const DetailHeaderSchema = z.object({
   score: z.number().min(1).max(10),
   confidence: z.enum(["low", "medium", "high"]),
   certaintyPreciousPct: z.number().min(0).max(100),
   flags: z.array(z.string()),
-  analysis: z.string(),
 });
+
+/**
+ * Parse the detail-analysis response: a one-line JSON header, the literal
+ * separator ===ANALYSIS===, then free markdown. Because the long essay lives
+ * OUTSIDE the JSON, output truncation can only shorten the essay — it can no
+ * longer corrupt the structured verdict (the old all-in-one-JSON format broke
+ * whenever max_tokens cut the response mid-string).
+ * Falls back to legacy single-JSON parsing for models that ignore the format.
+ */
+function parseDetailResponse(raw: string): DetailedAnalysis {
+  const sepMatch = raw.match(/^\s*={2,}\s*ANALYSIS\s*={2,}\s*$/im);
+  if (sepMatch && sepMatch.index !== undefined) {
+    const head = raw.slice(0, sepMatch.index);
+    const body = raw.slice(sepMatch.index + sepMatch[0].length).trim();
+    const header = DetailHeaderSchema.parse(extractJson(head));
+    return { ...header, analysis: body || "(analysis text missing)" };
+  }
+  // Legacy fallback: the whole thing is one JSON object with an analysis field.
+  const obj = extractJson(raw);
+  const header = DetailHeaderSchema.parse(obj);
+  return { ...header, analysis: typeof obj.analysis === "string" ? obj.analysis : "(analysis text missing)" };
+}
 
 const DETAIL_SYSTEM_PROMPT = `You are a seasoned antique jewellery dealer mentoring an apprentice. You are shown the photos of ONE Vinted listing (which may contain several pieces and may include front AND back views). You assess what is VISUALLY observable — you are NOT an authenticator and must never claim with 100% certainty that a metal/stone is genuine. But you DO teach the apprentice exactly what the photos suggest and why.
 
@@ -274,14 +295,11 @@ Finish with a short "Certainty estimate" section:
 - certainty it contains solid precious metal / real pearls / precious gems (a percentage)
 - certainty it is mass-produced costume jewellery / fashion accessory (a percentage)
 
-Return a JSON object ONLY (no markdown fences), with exactly this shape:
-{
-  "score": <integer 1-10, how worth-a-closer-look this listing is for a dealer>,
-  "confidence": "low" | "medium" | "high",
-  "certaintyPreciousPct": <integer 0-100, your certainty it contains REAL precious materials>,
-  "flags": ["<short tells, e.g. 'injection-molding nub on pearl back', 'glued cabochons', 'visible 925 stamp'>"],
-  "analysis": "<the full apprentice-teaching write-up as MARKDOWN text; use headings and bullet points; this is the main output and should be detailed>"
-}`;
+OUTPUT FORMAT — follow this EXACTLY. First output ONE line of compact JSON (no markdown fences) with the structured verdict, then the literal separator line ===ANALYSIS===, then the full write-up as normal markdown:
+
+{"score": <integer 1-10>, "confidence": "low"|"medium"|"high", "certaintyPreciousPct": <integer 0-100>, "flags": ["<short tells, e.g. 'glued cabochons', 'visible 925 stamp'>"]}
+===ANALYSIS===
+<the full apprentice-teaching write-up as MARKDOWN; use headings and bullet points; this is the main output and should be detailed>`;
 
 export async function analyzeListingDetailed(
   imageUrls: string[],
@@ -323,15 +341,15 @@ export async function analyzeListingDetailed(
       },
     ];
 
-    const data = await callOpenRouter(DETAIL_MODEL_ID, messages, 3000);
+    const data = await callOpenRouter(DETAIL_MODEL_ID, messages, 6000);
     const cost = estimateCost(data.usage, VISION_PRICE_IN, VISION_PRICE_OUT);
     logUsage("detail", { ...cost, model: DETAIL_MODEL_ID });
 
     const content: string = data.choices?.[0]?.message?.content ?? "";
     try {
-      return DetailedAnalysisSchema.parse(extractJson(content));
+      return parseDetailResponse(content);
     } catch (parseErr: any) {
-      console.warn(`⚠️ Detail JSON parse failed. Raw response (first 800 chars):\n${content.slice(0, 800)}`);
+      console.warn(`⚠️ Detail parse failed. Raw response (first 800 chars):\n${content.slice(0, 800)}`);
       throw parseErr;
     }
   } catch (err: any) {

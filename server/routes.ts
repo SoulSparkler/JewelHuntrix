@@ -167,11 +167,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Search query not found" });
       }
 
-      scanSearchQuery(searchQuery).catch(err => {
-        console.error("Background scan error:", err);
+      // Await with a time budget: fire-and-forget dies silently on serverless
+      // (the runtime freezes as soon as the response is sent). The scan is
+      // incremental — repeat the trigger to continue where it stopped.
+      const budgetMs = parseInt(process.env.SCAN_BUDGET_MS || "20000", 10);
+      const outcome = await scanSearchQuery(searchQuery, Date.now() + budgetMs);
+      res.json({
+        success: true,
+        listingsChecked: outcome.listingsChecked,
+        newFindings: outcome.newFindings,
+        partial: outcome.outOfTime,
+        message: outcome.outOfTime
+          ? `Analyzed ${outcome.listingsChecked} listings (time budget reached — trigger again to continue)`
+          : `Scan complete: ${outcome.listingsChecked} listings analyzed, ${outcome.newFindings} findings`,
       });
-      
-      res.json({ success: true, message: "Scan started" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

@@ -1,24 +1,23 @@
 // Netlify Scheduled Function — runs the Vinted scan on a serverless cron.
 //
-// Replaces the old node-cron-in-a-long-running-process model. The schedule is
-// set via the SCAN_CRON env var (falls back to every 2 hours). Netlify spreads
-// the per-search timing/jitter logic inside runScan/scanSearchQuery is no longer
-// needed because each invocation is independent; we add light jitter below to
-// avoid hitting Vinted at exactly the same wall-clock minute every time.
+// IMPORTANT TIME BUDGET: Netlify kills synchronous/scheduled functions after
+// ~30 seconds. A full scan (dozens of listings, each needing image downloads +
+// an AI vision call) cannot finish in one invocation. So runScan() is
+// TIME-BOXED: it processes as many un-analyzed listings as fit in the budget
+// and stops gracefully. Already-analyzed listings are recorded in the DB, so
+// every following invocation (cron or manual) picks up where the last one
+// stopped — the scan is incremental by design. The cron therefore runs every
+// 15 minutes: frequent small bites instead of one impossible big one.
+//
+// (The previous version slept a random 0-90s "jitter" before starting, which
+// exceeded the 30s limit — scheduled scans died in their own sleep. Removed.)
 //
 // Manual trigger for testing:  GET /.netlify/functions/scan
 
 import type { Config } from "@netlify/functions";
 import { runScan } from "../../server/services/run-scan";
 
-export default async (req: Request) => {
-  // Small random delay (0-90s) so we don't request on the exact cron tick.
-  // Skipped for manual (non-scheduled) invocations to keep the test snappy.
-  const isScheduled = req.headers.get("x-nf-event") === "schedule";
-  if (isScheduled) {
-    await new Promise((r) => setTimeout(r, Math.random() * 90_000));
-  }
-
+export default async (_req: Request) => {
   const result = await runScan();
   return new Response(JSON.stringify(result), {
     status: result.ok ? 200 : 500,
@@ -27,5 +26,5 @@ export default async (req: Request) => {
 };
 
 export const config: Config = {
-  schedule: process.env.SCAN_CRON || "0 */2 * * *",
+  schedule: process.env.SCAN_CRON || "*/15 * * * *",
 };

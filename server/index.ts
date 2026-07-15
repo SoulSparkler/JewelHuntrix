@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { registerRoutes } from "./routes";
@@ -8,9 +9,9 @@ import { testConnection } from "./db";
 const app = express();
 
 const allowedOrigins = [
-  "https://jewelhuntrix.netlify.app", // ✅ juiste Netlify-frontend
-  "http://localhost:5173",            // voor lokale dev
-  "https://vintedgemhuntrix.onrender.com" // optioneel: backend zelf
+  "https://treasurehuntrix.netlify.app", // ✅ juiste Netlify-frontend
+  "http://localhost:5173",               // voor lokale dev
+  "http://localhost:5000",               // lokale dev (Express + Vite same-origin)
 ];
 
 app.use(
@@ -56,7 +57,26 @@ app.use((req, res, next) => {
   next();
 });
 
+// Fail LOUDLY at boot on missing/placeholder credentials. A missing key must
+// never silently degrade into "every listing scores 1/10".
+function checkRequiredEnv(): void {
+  const problems: string[] = [];
+  const placeholder = (v: string | undefined) => !v || v.startsWith("PASTE_") || v.startsWith("your_");
+  if (placeholder(process.env.OPENROUTER_API_KEY)) problems.push("OPENROUTER_API_KEY (AI scoring will NOT work)");
+  if (placeholder(process.env.TELEGRAM_BOT_TOKEN)) problems.push("TELEGRAM_BOT_TOKEN (alerts will NOT be sent)");
+  if (placeholder(process.env.TELEGRAM_CHAT_ID)) problems.push("TELEGRAM_CHAT_ID (alerts will NOT be sent)");
+  if (placeholder(process.env.DATABASE_URL)) problems.push("DATABASE_URL (nothing can be saved)");
+  if (problems.length) {
+    console.error("\n" + "═".repeat(70));
+    console.error("🚨 MISSING OR PLACEHOLDER ENVIRONMENT VARIABLES:");
+    for (const p of problems) console.error(`   ✗ ${p}`);
+    console.error("   Fill these in .env (local) or Netlify env settings (production).");
+    console.error("═".repeat(70) + "\n");
+  }
+}
+
 (async () => {
+  checkRequiredEnv();
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -81,7 +101,8 @@ app.use((req, res, next) => {
     {
       port,
       host: "0.0.0.0",
-      reusePort: true,
+      // reusePort is not supported on Windows (ENOTSUP); only enable elsewhere.
+      ...(process.platform !== "win32" ? { reusePort: true } : {}),
     },
     async () => {
       log(`🚀 Serving on port ${port}`);

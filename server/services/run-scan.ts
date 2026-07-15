@@ -10,13 +10,21 @@ import { sendScanFailureAlert } from "./telegram";
  *   - the /api/scan dashboard route (manual trigger).
  *
  * It is self-contained and stateless: it records health into scan_state, alerts
- * on failure via Telegram, and runs the 30-day cleanup. Designed to finish well
- * within a serverless time budget for a handful of saved searches.
+ * on failure via Telegram, and runs the 30-day cleanup.
+ *
+ * TIME-BOXED: Netlify kills functions after ~30s, so each run analyzes as many
+ * new listings as fit in SCAN_BUDGET_MS and stops gracefully; analyzed-listing
+ * records in the DB make the next run resume where this one stopped. `partial`
+ * in the result tells the caller there is more work waiting.
  */
-export async function runScan(): Promise<{ ok: boolean; listingsChecked: number; newFindings: number; errors: string[] }> {
+const SCAN_BUDGET_MS = parseInt(process.env.SCAN_BUDGET_MS || "20000", 10);
+
+export async function runScan(): Promise<{ ok: boolean; partial: boolean; listingsChecked: number; newFindings: number; errors: string[] }> {
   const errors: string[] = [];
   let listingsChecked = 0;
   let newFindings = 0;
+  let partial = false;
+  const deadline = Date.now() + SCAN_BUDGET_MS;
 
   await storage.markScanStarted();
 
@@ -24,10 +32,15 @@ export async function runScan(): Promise<{ ok: boolean; listingsChecked: number;
     const searches = (await storage.getSearchQueries()).filter((s) => s.isActive);
 
     for (const search of searches) {
+      if (Date.now() + 10_000 > deadline) {
+        partial = true;
+        break;
+      }
       try {
-        const outcome = await scanSearchQuery(search);
+        const outcome = await scanSearchQuery(search, deadline);
         listingsChecked += outcome.listingsChecked;
         newFindings += outcome.newFindings;
+        if (outcome.outOfTime) partial = true;
       } catch (err: any) {
         const msg = `${search.searchLabel}: ${err.message}`;
         console.error(`❌ ${msg}`);
@@ -42,16 +55,16 @@ export async function runScan(): Promise<{ ok: boolean; listingsChecked: number;
     if (errors.length > 0) {
       await storage.markScanFinished({ success: false, listingsChecked, error: errors.join(" | ") });
       await sendScanFailureAlert(errors.join("\n"));
-      return { ok: false, listingsChecked, newFindings, errors };
+      return { ok: false, partial, listingsChecked, newFindings, errors };
     }
 
     await storage.markScanFinished({ success: true, listingsChecked });
-    return { ok: true, listingsChecked, newFindings, errors };
+    return { ok: true, partial, listingsChecked, newFindings, errors };
   } catch (err: any) {
     // Total failure (e.g. DB down): record + alert.
     console.error("❌ Scan run failed entirely:", err.message);
     await storage.markScanFinished({ success: false, listingsChecked, error: err.message }).catch(() => {});
     await sendScanFailureAlert(err.message);
-    return { ok: false, listingsChecked, newFindings, errors: [err.message] };
+    return { ok: false, partial, listingsChecked, newFindings, errors: [err.message] };
   }
 }
