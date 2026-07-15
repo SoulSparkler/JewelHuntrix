@@ -29,7 +29,17 @@ export async function runScan(): Promise<{ ok: boolean; partial: boolean; listin
   await storage.markScanStarted();
 
   try {
-    const searches = (await storage.getSearchQueries()).filter((s) => s.isActive);
+    // Order by least-recently-scanned first (never-scanned = oldest). Without
+    // this, a fixed createdAt order lets whichever search sits first in the
+    // list (e.g. one with a constant stream of "newest_first" listings) eat
+    // the entire time budget every run, starving every search after it.
+    const searches = (await storage.getSearchQueries())
+      .filter((s) => s.isActive)
+      .sort((a, b) => {
+        const aTime = a.lastScannedAt ? new Date(a.lastScannedAt).getTime() : 0;
+        const bTime = b.lastScannedAt ? new Date(b.lastScannedAt).getTime() : 0;
+        return aTime - bTime;
+      });
 
     for (const [i, search] of searches.entries()) {
       if (Date.now() + 10_000 > deadline) {
