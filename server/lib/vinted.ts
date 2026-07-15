@@ -74,8 +74,16 @@ async function getCookieJar(userAgent: string): Promise<string> {
 }
 
 /**
- * Convert a user-facing catalog URL (what the owner pastes into the dashboard)
- * into the internal API endpoint, preserving all search filters.
+ * Convert a user-facing URL (what the owner pastes into the dashboard) into the
+ * internal API endpoint, preserving all filters.
+ *
+ * Supports two shapes:
+ *   - a catalog search   → /api/v2/catalog/items?...   (keyword/brand/price filters)
+ *   - a member/seller URL → /api/v2/wardrobe/{id}/items (scan one seller's whole
+ *     wardrobe). e.g. https://www.vinted.nl/member/57257941
+ *
+ * NOTE: the wardrobe endpoint ignores price_to/price_from — those are enforced
+ * client-side in searchListings() instead (see priceBounds()).
  */
 function toApiUrl(catalogUrl: string): string {
   let parsed: URL;
@@ -89,7 +97,33 @@ function toApiUrl(catalogUrl: string): string {
   const params = parsed.searchParams;
   if (!params.has("per_page")) params.set("per_page", "48");
   if (!params.has("order")) params.set("order", "newest_first");
+
+  // Member/seller URL → that seller's wardrobe.
+  const memberMatch = parsed.pathname.match(/\/member\/(\d+)/);
+  if (memberMatch) {
+    return `${VINTED_BASE}/api/v2/wardrobe/${memberMatch[1]}/items?${params.toString()}`;
+  }
+
   return `${VINTED_BASE}/api/v2/catalog/items?${params.toString()}`;
+}
+
+/**
+ * Extract price_to / price_from from the pasted URL. Used to enforce a price cap
+ * client-side for member (wardrobe) scans, whose endpoint ignores those params.
+ * Harmless for catalog scans — Vinted already applied them server-side.
+ */
+function priceBounds(catalogUrl: string): { min: number; max: number } {
+  try {
+    const p = new URL(catalogUrl).searchParams;
+    const max = parseFloat(p.get("price_to") || "");
+    const min = parseFloat(p.get("price_from") || "");
+    return {
+      min: Number.isFinite(min) ? min : 0,
+      max: Number.isFinite(max) ? max : Infinity,
+    };
+  } catch {
+    return { min: 0, max: Infinity };
+  }
 }
 
 function fetchWithTimeout(url: string, init: RequestInit, ms = 12000): Promise<Response> {
@@ -128,7 +162,17 @@ export async function searchListings(catalogUrl: string): Promise<VintedListing[
   }
 
   const data: any = await res.json();
-  const items: any[] = Array.isArray(data.items) ? data.items : [];
+  let items: any[] = Array.isArray(data.items) ? data.items : [];
+
+  // Enforce price bounds client-side (the wardrobe endpoint ignores price_to).
+  const { min, max } = priceBounds(catalogUrl);
+  if (min > 0 || max < Infinity) {
+    items = items.filter((item) => {
+      const amt = parseFloat(item.price?.amount);
+      if (!Number.isFinite(amt)) return true; // keep unknown-price items
+      return amt >= min && amt <= max;
+    });
+  }
 
   return items.map((item) => {
     const photos: string[] = (item.photos || [])
