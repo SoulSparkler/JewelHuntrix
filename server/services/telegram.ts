@@ -1,13 +1,32 @@
-import TelegramBot from "node-telegram-bot-api";
 import { telegramRateLimiter } from "../utils/rate-limiter";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-let bot: TelegramBot | null = null;
+// Whether alerts can be sent at all (both env vars present).
+const botConfigured = Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID);
 
-if (TELEGRAM_BOT_TOKEN) {
-  bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
+/**
+ * Minimal Telegram Bot API client. The app only ever calls sendMessage, so a
+ * single fetch to the HTTP API replaces the node-telegram-bot-api dependency
+ * (which pulled in the deprecated `request` stack and its critical CVEs).
+ */
+async function tgSendMessage(text: string): Promise<void> {
+  const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      text,
+      parse_mode: "Markdown",
+      disable_web_page_preview: false,
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Telegram sendMessage: HTTP ${res.status} ${body.slice(0, 200)}`);
+  }
 }
 
 function formatMaterialDisplay(material: string): string {
@@ -56,7 +75,7 @@ export async function sendTelegramAlert(
     return false;
   }
 
-  if (!bot || !TELEGRAM_CHAT_ID) {
+  if (!botConfigured) {
     console.warn("Telegram bot not configured - skipping alert");
     return false;
   }
@@ -89,10 +108,7 @@ ${reasons.map(reason => `   • ${reason}`).join('\n')}
 *JewelHuntrix* | Powered by AI Treasure Detection
     `.trim();
 
-    await bot.sendMessage(TELEGRAM_CHAT_ID, message, {
-      parse_mode: "Markdown",
-      disable_web_page_preview: false,
-    });
+    await tgSendMessage(message);
 
     // Record the alert for rate limiting
     telegramRateLimiter.recordAlert(listingUrl);
@@ -112,7 +128,7 @@ ${reasons.map(reason => `   • ${reason}`).join('\n')}
  * Keeps the per-listing rate limiter / dedupe behaviour.
  */
 export async function sendTelegramMessage(text: string, dedupeKey?: string): Promise<boolean> {
-  if (!bot || !TELEGRAM_CHAT_ID) {
+  if (!botConfigured) {
     console.warn("Telegram bot not configured - skipping message");
     return false;
   }
@@ -120,10 +136,7 @@ export async function sendTelegramMessage(text: string, dedupeKey?: string): Pro
     return false;
   }
   try {
-    await bot.sendMessage(TELEGRAM_CHAT_ID, text, {
-      parse_mode: "Markdown",
-      disable_web_page_preview: false,
-    });
+    await tgSendMessage(text);
     if (dedupeKey) telegramRateLimiter.recordAlert(dedupeKey);
     return true;
   } catch (error: any) {
@@ -137,12 +150,10 @@ export async function sendTelegramMessage(text: string, dedupeKey?: string): Pro
  * the owner must know when the system is broken (Problem 3 requirement).
  */
 export async function sendScanFailureAlert(reason: string): Promise<void> {
-  if (!bot || !TELEGRAM_CHAT_ID) return;
+  if (!botConfigured) return;
   try {
-    await bot.sendMessage(
-      TELEGRAM_CHAT_ID,
+    await tgSendMessage(
       `⚠️ *JewelHuntrix scan mislukt*\n\nReden: ${reason}\nTijd: ${new Date().toLocaleString("nl-NL")}`,
-      { parse_mode: "Markdown" },
     );
   } catch (error: any) {
     console.error("❌ Could not send failure alert:", error.message);
@@ -153,13 +164,11 @@ export async function sendScanFailureAlert(reason: string): Promise<void> {
  * Daily heartbeat: confirms the scanner is alive.
  */
 export async function sendHealthPing(lastSuccessAt: Date | null, listingsChecked: number): Promise<void> {
-  if (!bot || !TELEGRAM_CHAT_ID) return;
+  if (!botConfigured) return;
   const last = lastSuccessAt ? lastSuccessAt.toLocaleString("nl-NL") : "nog geen";
   try {
-    await bot.sendMessage(
-      TELEGRAM_CHAT_ID,
+    await tgSendMessage(
       `✅ *JewelHuntrix draait*\n\nLaatste succesvolle run: ${last}\nListings gecheckt (laatste run): ${listingsChecked}`,
-      { parse_mode: "Markdown" },
     );
   } catch (error: any) {
     console.error("❌ Could not send health ping:", error.message);
