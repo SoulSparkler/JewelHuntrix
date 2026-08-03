@@ -1,0 +1,160 @@
+{
+  "schema_version": "1.0",
+  "name": "JewelHuntrix regional hallmark supplement (FR / BE / IT / ES / UK)",
+  "provenance": "LOCAL ADDITION - not part of the handoff rulesets. scrap-metal-rules.json stays authoritative and unmodified; this file is layered on top of it at load time so a future revision of the handoff file can drop in without merge conflicts. Entries already covered by the base ruleset (eagle head, boar head, crab, owl, and the numeric finenesses in its purity_map) are deliberately NOT repeated here.",
+  "verification_note": "Compiled from standard European assay practice. Purities for pictorial punches that legally cover more than one standard are set to the CONSERVATIVE value with purity_range recorded, matching how the base ruleset treats the boar's head and crab. Verify against a hallmark reference before relying on any single mark for a high-value purchase.",
+
+  "matching_rules": {
+    "requires_context_meaning": "The mark is a common English/Dutch word or a shape that appears in ordinary listing prose ('crab brooch', 'rose gold', 'swan pendant'). These only count as hallmarks when a metal word (gold/goud/zilver/plata/oro/argento/argent) or a hallmark word (hallmark/stamp/poincon/keurmerk/gestempeld) appears nearby, otherwise they produce constant false positives.",
+    "high_signal_numeric_additions": ["417", "583", "830", "833", "835", "915"],
+    "high_signal_note": "Distinctive jewellery finenesses that do not read as prices or quantities, so they match without needing a metal word. 333, 850, 875, 900 and 950 are deliberately excluded - each maps to more than one metal or reads too easily as an ordinary number.",
+    "base_ruleset_marks_needing_context": {
+      "marks": ["crab", "crabe", "owl", "chouette"],
+      "reason": "Both are ordinary nouns and both appear in the base ruleset's french_system. 'Crab brooch' and 'owl pendant' are extremely common Vinted listings - without a context requirement every one of them would be read as a French guarantee punch."
+    }
+  },
+
+  "regions": {
+    "france": {
+      "note": "France is the most systematically punched of these markets. The base ruleset already covers the eagle head (18k gold), boar's head, crab and owl; these are the remaining common punches.",
+      "gold": [
+        {
+          "marks": ["coquille", "shell mark", "poincon coquille"],
+          "purity_decimal": 0.585,
+          "requires_context": true,
+          "note": "French 14k gold punch, introduced 1994 when France began recognising 14k and 9k alongside 18k."
+        },
+        {
+          "marks": ["trefle", "trèfle", "clover mark", "poincon trefle"],
+          "purity_decimal": 0.375,
+          "requires_context": true,
+          "note": "French 9k gold punch, also introduced 1994."
+        },
+        {
+          "marks": ["tete de cheval", "tête de cheval", "horse head"],
+          "purity_decimal": 0.84,
+          "purity_uncertain": true,
+          "purity_range": [0.84, 0.92],
+          "requires_context": true,
+          "note": "Second-standard gold for small works, 1838-1919. Standard varied over that period - conservative value used. Dates the piece as antique, which matters more than the exact fineness."
+        }
+      ],
+      "silver": [
+        {
+          "marks": ["minerve", "minerva head", "tete de minerve", "tête de minerve"],
+          "purity_decimal": 0.8,
+          "purity_uncertain": true,
+          "purity_range": [0.8, 0.95],
+          "note": "The main French silver guarantee since 1838. Minerve 1 = 0.950, Minerve 2 = 0.800; the numeral beside the head distinguishes them and is almost never legible in a listing photo, so the conservative 0.800 is used."
+        },
+        {
+          "marks": ["950"],
+          "purity_decimal": 0.95,
+          "note": "French/continental first-standard silver. Ambiguous with 950 platinum, so a metal word is required before this matches."
+        },
+        {
+          "marks": ["cygne", "swan mark"],
+          "purity_decimal": 0.8,
+          "purity_uncertain": true,
+          "requires_context": true,
+          "note": "Applied to old or imported silver of unverified standard sold second-hand. Guarantees silver content but not a specific fineness - conservative value used."
+        }
+      ],
+      "platinum": [
+        {
+          "marks": ["tete de chien", "tête de chien", "dog head", "dog's head"],
+          "purity_decimal": 0.95,
+          "requires_context": true,
+          "note": "French platinum guarantee, in use since 1912. Platinum is rare in costume lots, so this punch is a strong find signal."
+        }
+      ]
+    },
+
+    "belgium": {
+      "note": "Belgium has never had compulsory assay marking, so pieces are marked with a plain numeric fineness or not at all. An UNMARKED Belgian piece is completely normal and must not be read as a negative - that is exactly the case the unmarked-suspicion path exists for.",
+      "gold": [
+        { "marks": ["333", "8k", "8kt"], "purity_decimal": 0.333, "note": "8k. Low fineness but genuinely solid gold. Common in Belgian, Dutch and German estate lots." },
+        { "marks": ["417", "10k", "10kt"], "purity_decimal": 0.417, "note": "10k, the US minimum legal standard; turns up in mixed continental lots." }
+      ],
+      "silver": [
+        { "marks": ["833"], "purity_decimal": 0.833, "note": "Common Belgian and Dutch silver standard, absent from the base ruleset." },
+        { "marks": ["835"], "purity_decimal": 0.835, "note": "Very common Dutch/Belgian/German standard - the single most likely gap when sourcing on vinted.nl." },
+        { "marks": ["830"], "purity_decimal": 0.83, "note": "Scandinavian standard, widely traded across the Low Countries." }
+      ]
+    },
+
+    "italy": {
+      "note": "Italian pieces carry the fineness plus a maker's mark in a diamond/lozenge containing a number and a two-letter province code (e.g. '45 MI' Milano, 'AR' Arezzo, 'VI' Vicenza). The lozenge alongside a fineness is the reliable tell.",
+      "gold": [
+        { "marks": ["500", "12k", "12kt"], "purity_decimal": 0.5, "note": "12k. Uncommon but legal in Italy; usually on chain." }
+      ],
+      "silver": [
+        { "marks": ["argento", "argento 800", "argento 925"], "purity_decimal": 0.8, "purity_uncertain": true, "purity_range": [0.8, 0.925], "requires_context": true, "note": "Italian for silver. 800 is the traditional Italian standard and 925 the modern export standard; the bare word does not distinguish them, so the conservative value is used unless a fineness number is also present." }
+      ],
+      "word_marks": {
+        "oro": "Italian for gold - used as a metal-context word, never as a fineness on its own",
+        "argento": "Italian for silver - same"
+      }
+    },
+
+    "spain": {
+      "note": "Spain's own silver standard (915) is unusual and easy to miss - it is not in the base ruleset and reads as a random number to anyone unfamiliar with it.",
+      "gold": [
+        { "marks": ["583"], "purity_decimal": 0.583, "note": "Older 14k variant also seen in Soviet-era and southern-European pieces." }
+      ],
+      "silver": [
+        { "marks": ["915"], "purity_decimal": 0.915, "note": "The distinctive Spanish silver standard. A genuine find signal precisely because most sellers do not recognise it." },
+        { "marks": ["plata de ley"], "purity_decimal": 0.925, "note": "Spanish for 'sterling standard silver'. Legally denotes 925 (occasionally 915 on older pieces)." }
+      ],
+      "word_marks": {
+        "plata": "Spanish for silver - metal-context word",
+        "oro": "Spanish for gold - metal-context word"
+      }
+    },
+
+    "united_kingdom": {
+      "note": "Full British hallmarks are a set: standard mark + assay-office town mark + date letter (+ maker). The base ruleset already covers 9ct/14ct/18ct/22ct and 925/958 numerically; what it lacks are the PICTORIAL standard marks, which are what a seller usually describes in words. Town marks (anchor, rose, castle) are deliberately NOT included as fineness marks - 'rose gold' and 'anchor pendant' would false-positive constantly.",
+      "silver": [
+        { "marks": ["lion passant", "walking lion", "passant lion"], "purity_decimal": 0.925, "note": "THE English sterling standard mark, in use since 1544. If a seller mentions a walking lion, the piece is claiming sterling." },
+        { "marks": ["britannia", "britannia standard"], "purity_decimal": 0.958, "requires_context": true, "note": "Higher British standard (0.958), marked with the seated Britannia figure. Mandatory 1697-1720, optional since." },
+        { "marks": ["lion rampant"], "purity_decimal": 0.925, "note": "Scottish sterling standard mark (Glasgow)." },
+        { "marks": ["leopard's head", "leopards head", "crowned leopard"], "purity_decimal": 0.925, "requires_context": true, "note": "London assay office town mark. Not itself a fineness, but in practice only appears on assayed sterling - conservative to treat as 925 when a hallmark context word is also present." },
+        { "marks": ["harp crowned"], "purity_decimal": 0.925, "requires_context": true, "note": "Dublin assay office mark (Ireland, but common in UK-sourced lots)." }
+      ],
+      "gold": [
+        { "marks": ["916"], "purity_decimal": 0.916, "note": "22ct. Already in the base ruleset's gold marks; repeated here only because British 22ct wedding bands are a common find." }
+      ]
+    }
+  },
+
+  "metal_context_word_additions": {
+    "note": "Extends the metal-context vocabulary so numeric finenesses that need corroboration can find it in the seller's own language.",
+    "gold": ["oro", "or", "goud", "gouden", "guld", "ouro"],
+    "silver": ["plata", "plata de ley", "argento", "argent", "silber", "zilver", "zilveren", "prata"],
+    "platinum": ["platino", "platine", "platina", "platin"]
+  },
+
+  "non_solid_additions": {
+    "note": "The base ruleset's non_solid_warnings covers GOLD plating only. These are the silver-side equivalents, which otherwise let a plated piece score as solid silver whenever a fineness number appears nearby. Moved here from a hardcoded list in scrap-metal.ts so all local additions live in one place.",
+    "marks": [
+      "epns",
+      "electroplated nickel silver",
+      "silver plated",
+      "silver-plated",
+      "silverplate",
+      "verzilverd",
+      "argente",
+      "argenté",
+      "plaque argent",
+      "nickel silver",
+      "german silver",
+      "alpacca",
+      "alpaca",
+      "metal blanco",
+      "nieuwzilver",
+      "925 plated",
+      "925 plating"
+    ],
+    "effect": "No silver content. Suppresses silver claims only - must never veto a gold or platinum mark elsewhere in a mixed lot."
+  }
+}

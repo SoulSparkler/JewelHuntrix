@@ -43,6 +43,11 @@ export interface IStorage {
   createManualScan(scan: InsertManualScan): Promise<ManualScan>;
   deleteManualScan(id: string): Promise<boolean>;
 
+  // Outcomes — ground truth recorded once a piece is in hand, so the
+  // unmarked-suspicion path's weights can eventually be checked against reality.
+  recordFindingOutcome(id: string, status: string, note?: string): Promise<Finding | undefined>;
+  recordManualScanOutcome(id: string, status: string, note?: string): Promise<ManualScan | undefined>;
+
   // Scan health / retention
   cleanupOldAnalyzedListings(days: number): Promise<void>;
   getScanState(): Promise<ScanState | undefined>;
@@ -128,21 +133,16 @@ export class PostgresStorage implements IStorage {
   }
 
   async createFinding(insertFinding: InsertFinding): Promise<Finding> {
+    // Spread first so every column on the findings table — including the
+    // valuation-path fields added after this function was written — reaches
+    // the insert. A hand-listed field set silently drops whatever it forgets;
+    // that's exactly how the valuation columns were going missing before this.
     const results = await db.insert(findings).values({
-      listingId: insertFinding.listingId,
-      listingUrl: insertFinding.listingUrl,
-      listingTitle: insertFinding.listingTitle,
-      price: insertFinding.price,
-      confidenceScore: insertFinding.confidenceScore,
-      aiReasoning: insertFinding.aiReasoning,
-      detectedMaterials: insertFinding.detectedMaterials,
-      reasons: insertFinding.reasons,
-      isValuable: insertFinding.isValuable,
+      ...insertFinding,
       lotType: insertFinding.lotType ?? 'single',
       sellerCountry: (insertFinding as any).sellerCountry ?? null,
       searchQueryId: insertFinding.searchQueryId ?? null,
       telegramSent: insertFinding.telegramSent ?? false,
-      expiresAt: insertFinding.expiresAt,
     } as any).returning();
     return results[0];
   }
@@ -166,13 +166,7 @@ export class PostgresStorage implements IStorage {
 
   async createManualScan(insertScan: InsertManualScan): Promise<ManualScan> {
     const results = await db.insert(manualScans).values({
-      listingUrl: insertScan.listingUrl,
-      listingTitle: insertScan.listingTitle,
-      confidenceScore: insertScan.confidenceScore,
-      aiReasoning: insertScan.aiReasoning,
-      detectedMaterials: insertScan.detectedMaterials,
-      reasons: insertScan.reasons,
-      isValuable: insertScan.isValuable,
+      ...insertScan,
       lotType: insertScan.lotType ?? 'single',
       price: insertScan.price ?? null,
     } as any).returning();
@@ -182,6 +176,22 @@ export class PostgresStorage implements IStorage {
   async deleteManualScan(id: string): Promise<boolean> {
     const results = await db.delete(manualScans).where(eq(manualScans.id, id)).returning();
     return results.length > 0;
+  }
+
+  async recordFindingOutcome(id: string, status: string, note?: string): Promise<Finding | undefined> {
+    const results = await db.update(findings)
+      .set({ outcomeStatus: status, outcomeNote: note ?? null, outcomeRecordedAt: new Date() })
+      .where(eq(findings.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async recordManualScanOutcome(id: string, status: string, note?: string): Promise<ManualScan | undefined> {
+    const results = await db.update(manualScans)
+      .set({ outcomeStatus: status, outcomeNote: note ?? null, outcomeRecordedAt: new Date() })
+      .where(eq(manualScans.id, id))
+      .returning();
+    return results[0];
   }
 
   // Scan health / retention

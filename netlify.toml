@@ -15,6 +15,17 @@
 #   VINTED_BASE_URL         optional, defaults to https://www.vinted.nl  (KEEP NL)
 #   VISION_SCORE_THRESHOLD  optional, default 7
 #   SCAN_CRON / HEALTH_CRON optional cron overrides
+#
+# Scrap-metal (melt value) path — all optional:
+#   METAL_PRICE_PROVIDER    none (default) | manual | http
+#   SPOT_PRICE_GOLD_EUR_PER_G / _SILVER_ / _PLATINUM_   used when provider=manual
+#   SPOT_PRICE_AS_OF        ISO date the manual prices were read (REQUIRED for manual)
+#   MAX_PRICE_AGE_HOURS     optional, default 24 — older prices are marked stale
+#   SCRAP_ALERT_MODE        underpriced_only (default) | all_hallmarks | off
+#   UNMARKED_ALERT_MODE     medium_and_high (default) | high_only | off
+#   ASSUMED_SHIPPING_EUR    optional, default 3.5 (caps already include shipping)
+# With no provider configured the scrap path still reports hallmarks — it just
+# omits the euro figure rather than guessing one.
 
 [build]
   command = "npm install && cd client && npm install && npm run build"
@@ -26,7 +37,7 @@
 
 [functions]
   node_bundler = "esbuild"
-  included_files = ["server/**", "shared/**"]
+  included_files = ["server/**", "shared/**", "docs/*.json"]
 
 # Route all /api/* calls to the serverless Express wrapper.
 [[redirects]]

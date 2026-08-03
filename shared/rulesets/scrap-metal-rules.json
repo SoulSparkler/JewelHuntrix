@@ -1,0 +1,206 @@
+{
+  "schema_version": "1.0",
+  "name": "JewelHuntrix scrap-metal ruleset",
+  "description": "Precious-metal melt-value ruleset. This is INDEPENDENT from jewelhuntrix-brands.json (the maker/design-value path). Use routing_logic below to decide which path (or both) applies to a given listing.",
+  "companion_file": "jewelhuntrix-brands.json",
+  "risk_budget": {
+    "principle": "Scrap-path pieces cannot be confirmed from a Vinted listing alone - true weight and true purity are only certain once the piece is at home and can be weighed, magnet-tested, or otherwise checked. Until then this is a bet on the seller's stated hallmark and an estimated/unconfirmed weight. The max_total_cost caps how much of that unconfirmed bet you're willing to place per item.",
+    "max_total_cost_eur": 10.0,
+    "includes_shipping": true,
+    "shipping_reference_note": "Jewelry shipping on Vinted is typically up to about EUR 3.50 - this is already included in the 10.00 cap, it is not an additional allowance on top.",
+    "meaning_of_the_cap": "asking_price + shipping_cost must be <= 10.00 EUR for a scrap_path listing to be worth buying on suspicion alone, BEFORE in-hand confirmation.",
+    "what_this_is_not": "This is NOT a value/profit threshold and NOT a replacement for the melt_value_formula comparison. A listing can pass this cap and still be a bad buy if melt value (once weight is confirmed) turns out lower than price. The cap only answers: 'is the unconfirmed risk small enough to take a chance on this item sight-unseen-in-hand?'",
+    "app_behavior": "If asking_price + shipping_cost > 10.00 EUR for a scrap_path (hallmark-confirmed-from-photo-only, weight-unconfirmed) listing, do not surface it as a buy candidate regardless of how good the melt-value estimate looks - the estimate is still unverified and the money at risk is too high for an unconfirmed bet. Once weight IS genuinely confirmed (seller-stated and credible, not estimated), this cap no longer applies and the normal melt_value_formula / underpriced_signal logic in scoring_notes takes over instead."
+  },
+  "routing_logic": {
+    "principle": "A brand/attribution signal and a hallmark signal are two separate, non-exclusive value paths. Never let one path's absence suppress the other.",
+    "rules": [
+      {
+        "condition": "listing/photos show a maker name, signature, or strong construction attribution (see jewelhuntrix-brands.json) and NO precious-metal hallmark",
+        "route": "brand_path",
+        "note": "Material is often base metal or plastic. Do not run scrap valuation - it will return ~0 and wrongly suppress the score."
+      },
+      {
+        "condition": "listing/photos show a precious-metal hallmark (925/800/999/375/585/750/916/950/900/Plat/PT) and NO maker name or attribution signal",
+        "route": "scrap_path",
+        "note": "Value is melt-value driven. Brand attribution effort is wasted here - go straight to weight + purity + spot price."
+      },
+      {
+        "condition": "both a maker/attribution signal AND a precious-metal hallmark are present",
+        "route": "both_paths_score_max",
+        "note": "Score both paths independently and take the higher estimate. A signed 14k/18k piece by a recognised maker can be worth more as a collectible than as scrap, or vice versa if condition is poor - never average the two, take the max."
+      },
+      {
+        "condition": "neither signal present",
+        "route": "unscored",
+        "note": "Not enough information to value via either path. Do not fabricate a score."
+      }
+    ]
+  },
+  "hallmark_lookup": {
+    "silver": {
+      "marks": [
+        "925",
+        "sterling",
+        "ster",
+        "800",
+        "999",
+        "fine silver",
+        "zilver 925"
+      ],
+      "purity_map": {
+        "999": 0.999,
+        "958": 0.958,
+        "925": 0.925,
+        "900": 0.9,
+        "800": 0.8
+      },
+      "note": "925/sterling is by far the most common in costume + fine jewelry. 800 common in older European pieces. 999 is investment/fine silver, rare in jewelry."
+    },
+    "gold": {
+      "marks": [
+        "375",
+        "9k",
+        "9ct",
+        "585",
+        "14k",
+        "14ct",
+        "750",
+        "18k",
+        "18ct",
+        "916",
+        "22k",
+        "22ct",
+        "999",
+        "24k"
+      ],
+      "purity_map": {
+        "375": 0.375,
+        "585": 0.585,
+        "750": 0.75,
+        "916": 0.916,
+        "999": 0.999
+      },
+      "karat_to_millesimal": {
+        "9k": "375",
+        "14k": "585",
+        "18k": "750",
+        "22k": "916",
+        "24k": "999"
+      },
+      "note": "9k/375 common in UK/older European gold. 14k/585 common in US. 18k/750 common in Europe/Middle East fine jewelry. 22k/916 common in Indian/Middle Eastern gold."
+    },
+    "platinum": {
+      "marks": [
+        "950",
+        "900",
+        "plat",
+        "pt",
+        "iridium platinum",
+        "ir plat"
+      ],
+      "purity_map": {
+        "950": 0.95,
+        "900": 0.9
+      },
+      "note": "Heavy, white, does not tarnish - a quick physical tell alongside the stamp. Less common than gold/silver in costume jewelry contexts, more common in fine jewelry."
+    },
+    "non_solid_warnings": {
+      "marks": [
+        "gf",
+        "gold-filled",
+        "gold filled",
+        "rgp",
+        "rolled gold plate",
+        "gp",
+        "gold plated",
+        "1/20 12k gf",
+        "vermeil"
+      ],
+      "effect": "NOT solid precious metal. Do not apply full purity_map melt calculation.",
+      "handling": {
+        "gold_filled": "Contains a bonded layer of gold (commonly 1/20th of total weight by law in the US). Has SOME scrap value but far below solid gold - use a fractional estimate (~5% of total weight as gold content) only if you must estimate, and flag as approximate.",
+        "plated_rolled": "Plating/rolled layer is microscopically thin. Scrap value is negligible - route to brand_path or unscored, not scrap_path.",
+        "vermeil": "Gold plating over sterling silver base - value the silver base only via scrap_path (verify the base is actually sterling), ignore the gold plating for melt purposes."
+      }
+    },
+    "french_system": {
+      "note": "France uses poincons (guarantee stamps) instead of / alongside numeric marks.",
+      "marks": {
+        "eagle_head": "18k gold guarantee (tete d'aigle)",
+        "boar_head": "silver guarantee, older mark (hure de sanglier)",
+        "crab": "silver guarantee",
+        "owl": "import/small-work guarantee mark, various purities - verify alongside a numeric or maker mark (chouette)"
+      },
+      "purity_map_reference": {
+        "eagle_head": 0.75,
+        "boar_head_or_crab": 0.8
+      }
+    }
+  },
+  "spot_price": {
+    "currency": "EUR",
+    "unit": "per_gram",
+    "update_policy": "Spot prices move daily/hourly. Do NOT hardcode a static number as ground truth in the app. Fetch or manually refresh regularly (recommend: daily) from a live source (e.g. LBMA-based feed, a price API, or manual entry) before running any melt-value calculation.",
+    "reference_values_at_time_of_writing": {
+      "note": "For orientation only - replace with a live/refreshed value before use.",
+      "silver_eur_per_gram_approx": 0.72,
+      "gold_eur_per_gram_approx": null,
+      "platinum_eur_per_gram_approx": null,
+      "as_of": "2026-08 (approximate, silver only - fetch current gold/platinum before use)"
+    },
+    "fields_app_should_maintain": [
+      "silver_eur_per_gram",
+      "gold_eur_per_gram",
+      "platinum_eur_per_gram",
+      "last_updated_timestamp"
+    ]
+  },
+  "melt_value_formula": {
+    "formula": "melt_value_eur = weight_grams * purity_decimal * spot_price_eur_per_gram",
+    "example": {
+      "scenario": "50cm sterling silver necklace, weight unknown in listing",
+      "weight_grams": "UNKNOWN - see weight_handling below",
+      "purity_decimal": 0.925,
+      "spot_price_eur_per_gram": 0.72,
+      "melt_value_if_5g": 3.33,
+      "melt_value_if_10g": 6.66,
+      "melt_value_if_15g": 10.0,
+      "melt_value_if_20g": 13.32
+    }
+  },
+  "weight_handling": {
+    "principle": "Weight in grams is the single most common missing variable in listings. Never silently assume a weight to force a score.",
+    "on_missing_weight": {
+      "action": "flag_unconfirmed_do_not_score",
+      "fallback_options": [
+        "Estimate a rough low/high range from visible chain/piece thickness and style in photos (label clearly as an estimate range, not a point value)",
+        "Flag listing for manual weight request to seller before computing a melt-value score",
+        "Surface listing as '<metal> <purity> - weight unconfirmed' in results rather than a false-precision numeric score"
+      ]
+    },
+    "on_present_weight": "Proceed with melt_value_formula directly."
+  },
+  "scoring_notes": {
+    "melt_value_is_a_floor": "Melt value is the minimum defensible value (scrap/bullion floor), not a resale ceiling. An intact, wearable piece can and often does sell above melt value for styling/wearability/brand reasons - do not cap a listing's estimated resale value at melt value.",
+    "underpriced_signal": "Flag as a strong buy signal when: asking_price (incl. shipping) < melt_value_at_current_spot, with weight confirmed (not estimated).",
+    "do_not_flag_on_estimated_weight": "If weight was estimated (not confirmed from listing/seller), do not auto-flag as underpriced - surface for manual review only."
+  },
+  "quick_physical_tests": [
+    {
+      "test": "magnet",
+      "method": "hold a strong magnet to the piece",
+      "read": "gold/silver/platinum/brass/copper are non-magnetic. Strong magnetic pull = base metal or steel, likely plated fake regardless of stamp."
+    },
+    {
+      "test": "weight_and_temperature",
+      "method": "heft it, touch to lip/cheek",
+      "read": "solid precious metal feels dense and cool. Suspiciously light for its size suggests hollow/plated/base metal."
+    },
+    {
+      "test": "loupe_on_hallmark",
+      "method": "10x loupe on the stamp",
+      "read": "crisp, correctly-shaped stamp vs mushy/blurred/wrong-shaped stamp (possible fake hallmark)."
+    }
+  ]
+}

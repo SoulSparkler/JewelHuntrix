@@ -7,15 +7,33 @@
     "A mark tells you what a piece claims to be; construction tells you what it is. Weight back-of-piece evidence highly.",
     "'Style' / 'inspired by' / 'in the manner of' next to a brand name means NOT attributed - treat as red flag."
   ],
+  "risk_budget": {
+    "principle": "Brand-path attribution can often be made with reasonable confidence directly from listing photos (visible mark, or several agreeing construction signals per the field guide) without needing the piece in hand first - unlike scrap_path and unmarked_suspicion_path, which cannot be confirmed until the piece is physically tested at home. That higher pre-purchase confidence justifies a higher risk budget.",
+    "max_total_cost_eur": 25,
+    "includes_shipping": true,
+    "shipping_reference_note": "Jewelry shipping on Vinted is typically up to about EUR 3.50 - already included in the 25.00 cap, not additional on top.",
+    "meaning_of_the_cap": "asking_price + shipping_cost must be <= 25.00 EUR for a brand_path listing to be worth buying on the strength of attribution signals alone.",
+    "what_this_is_not": "This is not a value ceiling on what a correctly-attributed piece is actually worth (many are worth far more) - it is a purchase-risk cap for how much to commit before the piece is confirmed in hand, given that some attributions still turn out wrong (see global_red_flags and the 'require several signals to agree' principle).",
+    "app_behavior": "If asking_price + shipping_cost > 25.00 EUR for a brand_path candidate, require a HIGHER confidence bar before surfacing as a buy candidate (e.g. a visible, legible mark rather than construction-only attribution, or multiple independently-checked signals) - do not suppress it outright the way scrap_path/unmarked_suspicion_path listings are suppressed above their caps, since strong attribution can genuinely justify a higher price. Below the 25.00 cap, normal scoring in this file applies without the extra confidence bar."
+  },
   "global_red_flags": [
     {
       "signal": "style_qualifier",
-      "keywords": ["style", "inspired by", "in the manner of", "type", "look"],
+      "keywords": [
+        "style",
+        "inspired by",
+        "in the manner of",
+        "type",
+        "look"
+      ],
       "effect": "not attributed - lower score / manual review"
     },
     {
       "signal": "glued_stones",
-      "keywords": ["glued", "glue"],
+      "keywords": [
+        "glued",
+        "glue"
+      ],
       "effect": "quality downgrade (except brands where gluing is normal)"
     },
     {
@@ -24,30 +42,51 @@
     },
     {
       "signal": "applied_nameplate",
-      "keywords": ["nameplate", "plate soldered"],
+      "keywords": [
+        "nameplate",
+        "plate soldered"
+      ],
       "effect": "possible reproduction (esp. Eisenberg/Trifari) - originals usually marked in mold"
     }
   ],
   "value_multipliers": [
     {
       "signal": "complete_set",
-      "keywords": ["parure", "demi-parure", "full set", "necklace and earrings", "matching set"],
+      "keywords": [
+        "parure",
+        "demi-parure",
+        "full set",
+        "necklace and earrings",
+        "matching set"
+      ],
       "weight_bonus": 15
     },
     {
       "signal": "sterling",
-      "keywords": ["sterling", "925"],
+      "keywords": [
+        "sterling",
+        "925"
+      ],
       "weight_bonus": 15,
       "note": "often signals 1940s manufacture + intrinsic silver value"
     },
     {
       "signal": "original_packaging",
-      "keywords": ["original box", "paperwork", "hang tag", "card"],
+      "keywords": [
+        "original box",
+        "paperwork",
+        "hang tag",
+        "card"
+      ],
       "weight_bonus": 10
     },
     {
       "signal": "copyright_symbol",
-      "keywords": ["©", "(c)", "copr"],
+      "keywords": [
+        "©",
+        "(c)",
+        "copr"
+      ],
       "note": "US costume jewelry: generally indicates post-1955"
     }
   ],
@@ -55,11 +94,20 @@
     {
       "id": "monet",
       "display_name": "Monet",
-      "aliases": ["monet", "monae", "monét"],
+      "aliases": [
+        "monet",
+        "monae",
+        "monét"
+      ],
       "base_score": 55,
       "founded": "early-to-mid 20th c.",
-      "key_people": ["Edmund Granville (former Cartier designer)"],
-      "marks": ["Monet", "Monet ©"],
+      "key_people": [
+        "Edmund Granville (former Cartier designer)"
+      ],
+      "marks": [
+        "Monet",
+        "Monet ©"
+      ],
       "positive_signals": [
         "triple-plated / thick warm consistent plating with little discoloration",
         "solid heavy construction",
@@ -67,17 +115,34 @@
         "YSL-style faux gold",
         "high-end clasp hardware (distinctive top lettering often mistaken for a karat stamp)"
       ],
-      "value_drivers": ["quality plating", "modern bold designs", "fashion-house collaborations (e.g. YSL)"],
-      "brand_red_flags": ["lightweight, warm-to-touch, or flaking plating (Monet plating is typically durable)"]
+      "value_drivers": [
+        "quality plating",
+        "modern bold designs",
+        "fashion-house collaborations (e.g. YSL)"
+      ],
+      "brand_red_flags": [
+        "lightweight, warm-to-touch, or flaking plating (Monet plating is typically durable)"
+      ]
     },
     {
       "id": "trifari",
       "display_name": "Trifari",
-      "aliases": ["trifari", "crown trifari", "ktf"],
+      "aliases": [
+        "trifari",
+        "crown trifari",
+        "ktf"
+      ],
       "base_score": 75,
       "founded": "1900s",
-      "key_people": ["Alfred Philippe (fine-jewelry techniques: pavé, invisible settings)"],
-      "marks": ["Trifari with crown over the T", "KTF (early)", "Trifari © (post-1955)", "Alfred Philippe era stamps"],
+      "key_people": [
+        "Alfred Philippe (fine-jewelry techniques: pavé, invisible settings)"
+      ],
+      "marks": [
+        "Trifari with crown over the T",
+        "KTF (early)",
+        "Trifari © (post-1955)",
+        "Alfred Philippe era stamps"
+      ],
       "positive_signals": [
         "crown-over-T mark (the desirable era)",
         "faux pearls that resist chipping/flaking",
@@ -86,7 +151,11 @@
         "large rhinestone sets",
         "jelly-belly figurals (Lucite)"
       ],
-      "value_drivers": ["Crown Trifari & Alfred Philippe era", "celebrity/department-store provenance", "quality construction"],
+      "value_drivers": [
+        "Crown Trifari & Alfred Philippe era",
+        "celebrity/department-store provenance",
+        "quality construction"
+      ],
       "brand_red_flags": [
         "bare word 'Trifari' with NO crown, ©, or patent wording = forgery red flag",
         "sterling piece with matte/frosted gold reverse can be a fake tell",
@@ -96,24 +165,47 @@
     {
       "id": "napier",
       "display_name": "Napier",
-      "aliases": ["napier"],
+      "aliases": [
+        "napier"
+      ],
       "base_score": 50,
       "positive_signals": [
         "minimalist / modernist clean designs",
         "geometric shapes, sleek chains, bold simple forms",
         "versatile pieces that suit modern wardrobes"
       ],
-      "marks": ["Napier"],
-      "value_drivers": ["minimalist vintage appeal", "versatility in modern markets"],
-      "brand_red_flags": ["gold plating quality is variable - grade each piece individually"]
+      "marks": [
+        "Napier"
+      ],
+      "value_drivers": [
+        "minimalist vintage appeal",
+        "versatility in modern markets"
+      ],
+      "brand_red_flags": [
+        "gold plating quality is variable - grade each piece individually"
+      ]
     },
     {
       "id": "coro",
       "display_name": "Coro / Corocraft",
-      "aliases": ["coro", "corocraft", "coro craft", "cororo", "vendome", "pegasus"],
+      "aliases": [
+        "coro",
+        "corocraft",
+        "coro craft",
+        "cororo",
+        "vendome",
+        "pegasus"
+      ],
       "base_score": 58,
       "founded": "early 20th c.",
-      "marks": ["Coro (script/cursive, basic line)", "Corocraft", "Pegasus logo (coveted)", "by Coro patent", "Sterling", "Vendome (prestige line)"],
+      "marks": [
+        "Coro (script/cursive, basic line)",
+        "Corocraft",
+        "Pegasus logo (coveted)",
+        "by Coro patent",
+        "Sterling",
+        "Vendome (prestige line)"
+      ],
       "positive_signals": [
         "Pegasus-marked pieces (jump in value)",
         "Corocraft Sterling",
@@ -122,16 +214,32 @@
         "detailed enamel figural brooches",
         "substantial weight and good plating"
       ],
-      "value_drivers": ["Pegasus mark", "sterling", "Corocraft/Vendome lines", "Duette sets", "figural enamel"],
-      "brand_red_flags": ["plain 'Coro' basic-line mark = lower value than Corocraft/Pegasus"]
+      "value_drivers": [
+        "Pegasus mark",
+        "sterling",
+        "Corocraft/Vendome lines",
+        "Duette sets",
+        "figural enamel"
+      ],
+      "brand_red_flags": [
+        "plain 'Coro' basic-line mark = lower value than Corocraft/Pegasus"
+      ]
     },
     {
       "id": "sarah_coventry",
       "display_name": "Sarah Coventry",
-      "aliases": ["sarah coventry", "sarah cov", "sarah coventry inc"],
+      "aliases": [
+        "sarah coventry",
+        "sarah cov",
+        "sarah coventry inc"
+      ],
       "base_score": 48,
       "founded": "1940s (direct-sales / early jewelry MLM)",
-      "marks": ["Sarah Coventry", "Sarah Cov", "patent stamp (implies higher quality)"],
+      "marks": [
+        "Sarah Coventry",
+        "Sarah Cov",
+        "patent stamp (implies higher quality)"
+      ],
       "positive_signals": [
         "named designs (e.g. 'Fashion Flower', 'Golden Petals') - collectors value by name",
         "complete sets",
@@ -139,16 +247,29 @@
         "elaborate/complicated designs",
         "thick durable substantial hardware with good click"
       ],
-      "value_drivers": ["named designs", "complete sets", "original paperwork and boxes", "sterling"],
-      "brand_red_flags": ["mass-production focus: more wear on reverse; not prong-set = not premium tier"]
+      "value_drivers": [
+        "named designs",
+        "complete sets",
+        "original paperwork and boxes",
+        "sterling"
+      ],
+      "brand_red_flags": [
+        "mass-production focus: more wear on reverse; not prong-set = not premium tier"
+      ]
     },
     {
       "id": "weiss",
       "display_name": "Weiss",
-      "aliases": ["weiss", "albert weiss"],
+      "aliases": [
+        "weiss",
+        "albert weiss"
+      ],
       "base_score": 62,
       "founded": "1940s",
-      "marks": ["Weiss", "Albert Weiss"],
+      "marks": [
+        "Weiss",
+        "Albert Weiss"
+      ],
       "positive_signals": [
         "holiday motifs (Christmas trees, snowflakes)",
         "large dramatic rhinestone sets",
@@ -156,13 +277,23 @@
         "strong even sparkle",
         "parure (necklace + earrings + bracelet + brooch)"
       ],
-      "value_drivers": ["holiday motifs", "AB stones", "large sets", "rhinestone quality"],
-      "brand_red_flags": ["glued-in stones = NOT genuine Weiss (Weiss is always prong-set)"]
+      "value_drivers": [
+        "holiday motifs",
+        "AB stones",
+        "large sets",
+        "rhinestone quality"
+      ],
+      "brand_red_flags": [
+        "glued-in stones = NOT genuine Weiss (Weiss is always prong-set)"
+      ]
     },
     {
       "id": "lisner",
       "display_name": "Lisner",
-      "aliases": ["lisner", "lizner"],
+      "aliases": [
+        "lisner",
+        "lizner"
+      ],
       "base_score": 45,
       "positive_signals": [
         "molded lucite 'jelly leaf' pieces",
@@ -171,66 +302,136 @@
         "frosted lucite (often misidentified as frosted glass)",
         "mid-century aesthetic, nostalgia-driven"
       ],
-      "marks": ["Lisner (clasps typically signed)"],
-      "value_drivers": ["rare jelly-leaf colors", "cult collector following", "nostalgia"],
-      "construction_tells": ["plastic is MOLDED not glued", "veining is raised not painted", "metalwork simple but clean"],
-      "brand_red_flags": ["painted (not raised) veining or glued plastic = not genuine Lisner construction"]
+      "marks": [
+        "Lisner (clasps typically signed)"
+      ],
+      "value_drivers": [
+        "rare jelly-leaf colors",
+        "cult collector following",
+        "nostalgia"
+      ],
+      "construction_tells": [
+        "plastic is MOLDED not glued",
+        "veining is raised not painted",
+        "metalwork simple but clean"
+      ],
+      "brand_red_flags": [
+        "painted (not raised) veining or glued plastic = not genuine Lisner construction"
+      ]
     },
     {
       "id": "kramer",
       "display_name": "Kramer",
-      "aliases": ["kramer", "christian dior by kramer", "kramer of new york"],
+      "aliases": [
+        "kramer",
+        "christian dior by kramer",
+        "kramer of new york"
+      ],
       "base_score": 60,
-      "marks": ["Kramer", "Christian Dior by Kramer", "small Dior stamps (check carefully)"],
-      "positive_signals": ["prong-set stones only", "refined dimensional metalwork", "Christian Dior collaboration lines"],
-      "value_drivers": ["Dior collaboration (couture crossover)", "refined construction"],
-      "brand_red_flags": ["missed tiny Dior stamp = under-attributed; verify magnified"]
+      "marks": [
+        "Kramer",
+        "Christian Dior by Kramer",
+        "small Dior stamps (check carefully)"
+      ],
+      "positive_signals": [
+        "prong-set stones only",
+        "refined dimensional metalwork",
+        "Christian Dior collaboration lines"
+      ],
+      "value_drivers": [
+        "Dior collaboration (couture crossover)",
+        "refined construction"
+      ],
+      "brand_red_flags": [
+        "missed tiny Dior stamp = under-attributed; verify magnified"
+      ]
     },
     {
       "id": "miriam_haskell",
       "display_name": "Miriam Haskell",
-      "aliases": ["miriam haskell", "haskell"],
+      "aliases": [
+        "miriam haskell",
+        "haskell"
+      ],
       "base_score": 78,
-      "marks": ["Miriam Haskell (marks vary by year: oval plaque, horseshoe, script tag)", "early pieces often unsigned"],
+      "marks": [
+        "Miriam Haskell (marks vary by year: oval plaque, horseshoe, script tag)",
+        "early pieces often unsigned"
+      ],
       "positive_signals": [
         "hand-wired intricate designs",
         "beads, faux pearls, filigree",
         "artistic, layered components",
         "Russian-gold-tone filigree"
       ],
-      "value_drivers": ["handmade high-art quality", "large collector base", "provenance (e.g. worn by Joan Crawford)"],
-      "construction_tells": ["flip over: visible wire work and NO glue", "components feel artistic and layered, not mass-stamped"],
-      "brand_red_flags": ["modern findings/bead types unavailable in the 1940s = reproduction"]
+      "value_drivers": [
+        "handmade high-art quality",
+        "large collector base",
+        "provenance (e.g. worn by Joan Crawford)"
+      ],
+      "construction_tells": [
+        "flip over: visible wire work and NO glue",
+        "components feel artistic and layered, not mass-stamped"
+      ],
+      "brand_red_flags": [
+        "modern findings/bead types unavailable in the 1940s = reproduction"
+      ]
     },
     {
       "id": "designer_tier",
       "display_name": "Designer tier (Dior / Oscar de la Renta / Kenzo / YSL)",
-      "aliases": ["christian dior", "chr dior", "chr. dior", "dior", "oscar de la renta", "kenzo", "ysl", "yves saint laurent"],
+      "aliases": [
+        "christian dior",
+        "chr dior",
+        "chr. dior",
+        "dior",
+        "oscar de la renta",
+        "kenzo",
+        "ysl",
+        "yves saint laurent"
+      ],
       "base_score": 80,
       "sub_brands": [
         {
           "name": "Christian Dior",
-          "marks": ["Christian Dior", "CHR. DIOR (abbreviated on small pieces)"],
+          "marks": [
+            "Christian Dior",
+            "CHR. DIOR (abbreviated on small pieces)"
+          ],
           "note": "Most common designer brand in thrift stores; never precious metal, so often overlooked. Watch the hyphenated 'CHR. DIOR' abbreviation - many sellers don't recognise it."
         },
         {
           "name": "Oscar de la Renta",
-          "marks": ["Oscar de la Renta"],
+          "marks": [
+            "Oscar de la Renta"
+          ],
           "note": "Ear-wrapping designs; commonly overlooked at yard/estate sales (no precious metal). Good resale."
         },
         {
           "name": "Kenzo",
-          "marks": ["Kenzo (signed on top)"],
+          "marks": [
+            "Kenzo (signed on top)"
+          ],
           "note": "Costume jewelry made 80s/90s/2000s; less commonly produced = value in brand name + scarcity. Plating can rub off / not highly polished, but still valuable. Try Google Lens."
         },
         {
           "name": "YSL",
-          "marks": ["YSL", "Yves Saint Laurent"],
+          "marks": [
+            "YSL",
+            "Yves Saint Laurent"
+          ],
           "note": "Chunky designer looks; same collectors chase Dior clip-ons."
         }
       ],
-      "value_drivers": ["designer brand name alone", "limited production", "fuller / more elaborate pieces", "chunky statement designs"],
-      "brand_red_flags": ["no precious-metal content means easy to overlook - that's the opportunity, not a downgrade"]
+      "value_drivers": [
+        "designer brand name alone",
+        "limited production",
+        "fuller / more elaborate pieces",
+        "chunky statement designs"
+      ],
+      "brand_red_flags": [
+        "no precious-metal content means easy to overlook - that's the opportunity, not a downgrade"
+      ]
     }
   ]
 }

@@ -1,9 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertSearchQuerySchema, insertManualScanSchema } from "../shared/schema";
+import { insertSearchQuerySchema, insertManualScanSchema, outcomeStatusEnum } from "../shared/schema";
 import { getListing } from "./lib/vinted";
 import { scoreListingImages, analyzeListingDetailed, generateAlertMessage } from "./lib/openrouter";
+import { valuateListing, toValuationColumns, describeValuation } from "./lib/valuation";
+import { getSpotPrices } from "./lib/spot-price";
 import { scanSearchQuery } from "./services/scanner";
 import { runScan } from "./services/run-scan";
 import { sendTelegramMessage } from "./services/telegram";
@@ -196,6 +198,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Record what actually happened once a piece is in hand — the ground truth
+  // the unmarked-suspicion path's weights need before they can be calibrated
+  // against anything. status is one of outcomeStatusEnum; note is free text
+  // (e.g. "found 800 stamp inside band" / "magnet test failed").
+  app.post("/api/findings/:id/outcome", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const parsed = outcomeStatusEnum.safeParse(req.body?.status);
+      if (!parsed.success) {
+        return res.status(400).json({ error: `status must be one of: ${outcomeStatusEnum.options.join(", ")}` });
+      }
+      const updated = await storage.recordFindingOutcome(id, parsed.data, req.body?.note);
+      if (!updated) return res.status(404).json({ error: "Finding not found" });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.delete("/api/findings/:id", async (req, res) => {
     try {
       const { id } = req.params;
@@ -265,6 +286,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // cheap bulk pre-filter). The long-form write-up is stored in aiReasoning.
       const detail = await analyzeListingDetailed(listing.imageUrls, listing.title, listing.description);
       const SCORE_THRESHOLD = parseInt(process.env.VISION_SCORE_THRESHOLD || "7", 10);
+
+      // Routing step: brand path, scrap path, both (max), or unscored.
+      const shippingEur = parseFloat(process.env.ASSUMED_SHIPPING_EUR || "3.5");
+      const priceCleaned = (listing.price || "").replace(/[^\d.,]/g, "").replace(",", ".");
+      const priceEur = parseFloat(priceCleaned);
+      const valuation = await valuateListing(
+        listing.title,
+        listing.description,
+        detail.flags,
+        Number.isFinite(priceEur) ? priceEur + shippingEur : undefined,
+        detail.metalSignals,
+      );
+
       const isValuable = detail.score >= SCORE_THRESHOLD && detail.confidence !== "low";
       // Confidence shown in the UI = certainty it contains REAL precious materials.
       const confidencePct = detail.certaintyPreciousPct;
@@ -280,6 +314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isValuable,
         lotType: 'mixed', // Antique dealer approach
         price: listing.price,
+        ...toValuationColumns(valuation),
       });
 
       console.log("✅ Created manual scan:", scan.id);
@@ -292,7 +327,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           price: listing.price,
           url,
           sellerCountry: listing.sellerCountry,
-          score: { score: detail.score, reasoning: detail.analysis, flags: detail.flags, confidence: detail.confidence },
+          score: {
+            score: detail.score,
+            reasoning: detail.analysis,
+            flags: detail.flags,
+            confidence: detail.confidence,
+            metalSignals: detail.metalSignals,
+          },
+          valuation: describeValuation(valuation),
         });
         await sendTelegramMessage(message, url);
       } else {
@@ -311,7 +353,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         analysis: detail.analysis,
         reasons: detail.flags,
         listingTitle: listing.title,
-        price: listing.price
+        price: listing.price,
+        // Which path(s) produced the score, so the caller can tell "valuable
+        // because of who made it" from "valuable because of what it's made of".
+        valuation: {
+          path: valuation.path,
+          tag: valuation.tag,
+          score: valuation.score,
+          scoredBy: valuation.scoredBy,
+          summary: valuation.summary,
+          buyCandidate: valuation.buyCandidate,
+          suppressedReason: valuation.suppressedReason,
+          riskCapEur: valuation.riskCapEur,
+          brand: valuation.brand?.best
+            ? { name: valuation.brand.best.displayName, score: valuation.brand.score }
+            : null,
+          // Path 3. Carries no value field by design — see its hard_rule.
+          suspicion: valuation.suspicion
+            ? {
+                level: valuation.suspicion.suspicionLevel,
+                signalsTriggered: valuation.suspicion.signalsTriggered,
+                signalsMissingNote: valuation.suspicion.signalsMissingNote,
+                recommendedAction: valuation.suspicion.recommendedAction,
+                explicitDisclaimer: valuation.suspicion.explicitDisclaimer,
+                priorityBoost: valuation.suspicion.priorityBoost,
+              }
+            : null,
+          scrap: valuation.scrap
+            ? {
+                label: valuation.scrap.label,
+                metal: valuation.scrap.metal,
+                purityDecimal: valuation.scrap.purityDecimal,
+                weightGrams: valuation.scrap.weightGrams,
+                weightConfirmed: valuation.scrap.weightConfirmed,
+                weightReason: valuation.scrap.weightReason,
+                meltValueEur: valuation.scrap.meltValueEur,
+                spotPriceEurPerGram: valuation.scrap.spotPriceEurPerGram,
+                spotPriceAsOf: valuation.scrap.spotPriceAsOf,
+                spotPriceStale: valuation.scrap.spotPriceStale,
+                valueUnavailableReason: valuation.scrap.valueUnavailableReason,
+                underpricedVsMelt: valuation.scrap.underpricedVsMelt,
+                notes: valuation.scrap.notes,
+              }
+            : null,
+        },
       });
     } catch (error: any) {
       console.error("❌ analyze-listing error:", error.message, "| body:", JSON.stringify(req.body), "| stack:", error.stack);
@@ -335,6 +420,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(scans);
     } catch (error: any) {
       console.error("❌ Error getting manual scans:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/manual-scans/:id/outcome", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const parsed = outcomeStatusEnum.safeParse(req.body?.status);
+      if (!parsed.success) {
+        return res.status(400).json({ error: `status must be one of: ${outcomeStatusEnum.options.join(", ")}` });
+      }
+      const updated = await storage.recordManualScanOutcome(id, parsed.data, req.body?.note);
+      if (!updated) return res.status(404).json({ error: "Manual scan not found" });
+      res.json(updated);
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
@@ -368,6 +468,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       res.status(500).json({ status: "error", error: error.message });
+    }
+  });
+
+  // Spot-price feed status. The scrap path silently degrades to "no euro
+  // figure" when this is unavailable or stale, so it needs to be inspectable.
+  app.get("/api/spot-prices", async (req, res) => {
+    try {
+      const result = await getSpotPrices();
+      if (!result.available) {
+        return res.json({
+          available: false,
+          reason: result.reason,
+          provider: process.env.METAL_PRICE_PROVIDER || "none",
+          note: "Scrap-path listings are surfaced with their hallmark but without a melt value.",
+        });
+      }
+      res.json({
+        available: true,
+        provider: process.env.METAL_PRICE_PROVIDER || "none",
+        source: result.prices.source,
+        eurPerGram: result.prices.eurPerGram,
+        lastUpdatedTimestamp: result.prices.lastUpdatedTimestamp,
+        ageHours: Math.round(result.prices.ageHours * 10) / 10,
+        stale: result.prices.stale,
+      });
+    } catch (error: any) {
+      res.status(500).json({ available: false, error: error.message });
     }
   });
 

@@ -20,7 +20,28 @@ export default function FindingCardExample() {
     telegramSent: false,
     expiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
     lastScannedAt: null,
-    scanIntervalMinutes: 90
+    scanIntervalMinutes: 90,
+    // Scored by the scrap path: a readable 585 mark plus a seller-stated
+    // weight, which is what makes the melt figure (and the flag) legitimate.
+    valuationPath: 'scrap_path',
+    valuationTag: 'Scrap value',
+    valuationScore: 92,
+    scrapMetal: 'gold',
+    scrapPurityMillesimal: 585,
+    scrapWeightGrams: '3.20',
+    scrapWeightConfirmed: true,
+    meltValueEur: '196.56',
+    underpricedVsMelt: true,
+    // Path 3 fields stay empty: this example was scored from a visible mark,
+    // so the unmarked-suspicion path never ran.
+    suspicionLevel: null,
+    suspicionSignals: [],
+    recommendedAction: null,
+    buyCandidate: true,
+    suppressedReason: null,
+    outcomeStatus: null,
+    outcomeNote: null,
+    outcomeRecordedAt: null
   };
 
   return (

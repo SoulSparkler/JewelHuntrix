@@ -1,0 +1,187 @@
+{
+  "schema_version": "1.0",
+  "name": "JewelHuntrix unmarked precious-metal suspicion scoring",
+  "description": "Third, independent valuation path. This path is for pieces with NO visible hallmark/stamp in the photos or listing text, where the piece might still be real gold or silver. Scored ONLY from what a Vinted photo + listing text can show - no physical tests (no magnet, no acid, no loupe-in-hand). This is a suspicion/probability score, not a confirmed identification.",
+  "companion_files": [
+    "jewelhuntrix-brands.json",
+    "scrap-metal-rules.json"
+  ],
+  "relationship_to_other_paths": {
+    "brand_path": "jewelhuntrix-brands.json - values by maker/design attribution, material often irrelevant",
+    "scrap_path": "scrap-metal-rules.json - values by melt calculation, REQUIRES a visible hallmark",
+    "unmarked_suspicion_path": "THIS FILE - no hallmark visible, but visual/textual clues suggest the piece could still be real precious metal. Purely investigative, always ends in a recommendation to verify in hand, never a melt-value number."
+  },
+  "routing_trigger": {
+    "condition": "listing shows a metal-look piece (ring/chain/bracelet/pendant) with NO hallmark visible in any photo AND NO hallmark mentioned in text",
+    "action": "run this path instead of scrap_path (which requires a hallmark) and instead of/alongside brand_path",
+    "important": "Absence of a visible hallmark in photos does NOT mean absence of a hallmark on the piece - sellers rarely photograph the inside of a ring or the clasp closely. Score as 'hallmark not visible' not 'hallmark absent'."
+  },
+  "core_principle": "This path produces a SUSPICION SCORE (low / medium / high) with stated reasoning, never a value or a confirmed material claim. The only valid recommendation this path can output is: 'worth requesting more photos / weight / a closer look', never 'this is gold' or a euro estimate.",
+  "risk_budget": {
+    "principle": "This entire path is, by definition, unconfirmed - there is no visible hallmark, so material and purity are guesses even at 'high' suspicion. Certainty only comes once the piece is home and can be checked (weighed, magnet-tested, hallmark looked for in hand). The max_total_cost caps how much you're willing to risk on that guess.",
+    "max_total_cost_eur": 10.0,
+    "includes_shipping": true,
+    "shipping_reference_note": "Jewelry shipping on Vinted is typically up to about EUR 3.50 - already included in the 10.00 cap, not additional on top.",
+    "meaning_of_the_cap": "asking_price + shipping_cost must be <= 10.00 EUR for an unmarked_suspicion_path listing to be worth buying, REGARDLESS of suspicion level (low/medium/high).",
+    "app_behavior": "Even a 'high' suspicion listing should not be surfaced as a buy candidate if asking_price + shipping_cost exceeds 10.00 EUR - a high suspicion score means the visual signals are more consistent with precious metal, not that the material is confirmed. The cap reflects that this path can be wrong even at its most confident. If asking_price + shipping_cost <= 10.00 EUR, use suspicion_level to prioritise which of the affordable candidates to review first, not to override the cap upward."
+  },
+  "visual_signals": {
+    "color_and_tone": [
+      {
+        "signal": "warm, buttery, slightly muted yellow (not a bright brassy yellow)",
+        "suggests": "possible gold (14k-18k tone)",
+        "weight": "medium",
+        "caution": "brass, plated base metal, and gold-tone stainless steel can all mimic this in a compressed/filtered photo - photo white balance is unreliable"
+      },
+      {
+        "signal": "bright, hard, slightly greenish-yellow shine, very uniform, almost too perfect",
+        "suggests": "likely base metal / plating, not solid gold",
+        "weight": "medium negative",
+        "caution": "some genuine higher-karat gold (22k+) can also look very saturated - do not treat as a hard rule"
+      },
+      {
+        "signal": "grayish-white with a soft, slightly warm sheen (not stark white/blue)",
+        "suggests": "possible silver",
+        "weight": "medium",
+        "caution": "stainless steel, white gold, and rhodium-plated base metal all look similar in photos"
+      },
+      {
+        "signal": "cold, hard, bluish-white shine, mirror-like",
+        "suggests": "likely stainless steel or chrome/rhodium plating rather than solid silver",
+        "weight": "low negative",
+        "caution": "polished silver can also photograph this way under harsh flash - weak signal alone"
+      }
+    ],
+    "wear_and_tarnish_pattern": [
+      {
+        "signal": "dark, blotchy tarnish concentrated in recesses/engraved detail, rest still bright",
+        "suggests": "consistent with real sterling silver tarnishing pattern",
+        "weight": "medium positive"
+      },
+      {
+        "signal": "worn patches showing a different color/metal underneath (e.g. yellow worn through to show grayish or pinkish base)",
+        "suggests": "plating wearing off a base metal - strong sign it is NOT solid precious metal",
+        "weight": "high negative",
+        "note": "this is one of the more reliable visual tells available from photos - look closely at high-friction points: clasp, inside of rings, chain links that rub"
+      },
+      {
+        "signal": "even, unchanging color across the whole piece including high-friction wear points, after visible age/wear on the design itself",
+        "suggests": "consistent with solid precious metal (nothing to wear through to)",
+        "weight": "medium positive"
+      },
+      {
+        "signal": "greenish residue near clasp or on skin-contact areas mentioned in text or visible in photos",
+        "suggests": "copper-alloy base metal reacting with skin oils - a classic 'not real' tell",
+        "weight": "high negative"
+      }
+    ],
+    "solder_and_construction": [
+      {
+        "signal": "visible solder joins that are colour-matched and blended smoothly into the piece",
+        "suggests": "more consistent with genuine precious-metal manufacture (jewelers solder-match to the base metal)",
+        "weight": "medium positive"
+      },
+      {
+        "signal": "visible solder joins in a clearly different, mismatched color (silvery solder on a yellow piece or vice versa)",
+        "suggests": "cheap repair or base-metal construction - lowers confidence",
+        "weight": "medium negative"
+      },
+      {
+        "signal": "seamless cast construction with no visible solder at all on a design that would normally require joins",
+        "suggests": "could be cast base metal (cheaper single-pour production) OR could be a well-made cast precious piece - ambiguous, weak signal alone",
+        "weight": "neutral"
+      },
+      {
+        "signal": "pitting, bubbling, or a rough grainy texture in the metal surface visible on close photos",
+        "suggests": "lower-quality base metal casting",
+        "weight": "medium negative"
+      }
+    ],
+    "weight_and_form_inference": [
+      {
+        "signal": "listing/photos show a noticeably thick, substantial chain or ring shank",
+        "suggests": "worth more attention regardless of material confidence - if it IS real, weight drives melt value directly",
+        "weight": "raises priority, not confidence"
+      },
+      {
+        "signal": "piece appears to sag, bend, or drape heavily under its own weight in the photo (e.g. a chain pooling densely rather than lying loosely)",
+        "suggests": "consistent with a denser, potentially precious metal rather than lightweight base metal",
+        "weight": "low positive",
+        "caution": "very weak signal - photo compression and lighting easily mislead here"
+      }
+    ],
+    "listing_text_clues": [
+      {
+        "signal": "seller describes it as 'oma's sieraad', 'erfstuk', 'gevonden', 'oud', 'weet niet meer waar vandaan' (grandma's jewelry, heirloom, found, old, don't know the origin)",
+        "suggests": "higher chance the seller doesn't know what they have and hasn't checked for a hallmark - raises the value of a closer look",
+        "weight": "raises priority, not confidence"
+      },
+      {
+        "signal": "listing title/description uses uncertain material language: 'lijkt goud', 'zou zilver kunnen zijn', 'weet niet of het echt is' (looks like gold, might be silver, don't know if real)",
+        "suggests": "seller themselves is unsure - worth investigating, but treat their guess as noise, not signal",
+        "weight": "raises priority, not confidence"
+      },
+      {
+        "signal": "listing explicitly states 'namaak', 'nep', 'modesieraad', 'fantasie' (fake, costume, fantasy jewelry)",
+        "suggests": "seller is asserting it is NOT precious metal - do not override this without a strong contrary visual signal, but note sellers are sometimes wrong in both directions",
+        "weight": "high negative, but not absolute"
+      }
+    ]
+  },
+  "suspicion_score_model": {
+    "levels": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "method": "Sum weighted signals present (positive raises, negative lowers). This is a HEURISTIC POINTER for triage, not a calibrated probability - the true positive/negative rate of these visual cues has not been independently validated for this ruleset.",
+    "low": {
+      "meaning": "one or zero weak positive signals, or one or more negative signals present",
+      "recommended_action": "low priority - likely costume/base metal, skip unless brand_path also flags it"
+    },
+    "medium": {
+      "meaning": "two or more medium-weight positive signals with no strong negative signal contradicting them",
+      "recommended_action": "worth a closer look - request more photos (clasp close-up, inside of ring/band, any engraved area) and ask seller for weight before buying"
+    },
+    "high": {
+      "meaning": "three or more positive signals across different categories (color + wear-pattern + weight/form), with no negative signal present, AND a plausible reason the hallmark might simply not be visible (e.g. inside of a ring band not photographed, worn-smooth stamp area)",
+      "recommended_action": "flag for manual review as a priority buy candidate - still requires in-hand verification (weigh it, check for a hallmark in hand, consider a jeweler/testing kit) before treating as confirmed precious metal"
+    },
+    "hard_rule": "This path NEVER outputs a euro value or a 'this is gold/silver' claim. Maximum output is a suspicion level + the specific signals that drove it + a recommended next action. Melt-value calculation only happens in scrap_path, only after a hallmark is confirmed (either visible in a photo, or reported by the seller/buyer after asking)."
+  },
+  "known_confusable_materials": {
+    "note": "Materials that commonly get mistaken for precious metal in exactly this unmarked-photo scenario - useful as a caution list, not a rejection list.",
+    "list": [
+      {
+        "material": "brass",
+        "mimics": "gold",
+        "typical_tell": "can develop a slightly pinkish or greenish tarnish over time, unlike gold which does not tarnish"
+      },
+      {
+        "material": "stainless steel",
+        "mimics": "silver or white gold",
+        "typical_tell": "extremely hard, bright, cold-toned shine; often used in modern budget jewelry with NO hallmark by design"
+      },
+      {
+        "material": "gold-tone / silver-tone plated base metal",
+        "mimics": "solid gold or silver",
+        "typical_tell": "wear-through at friction points revealing a different color underneath - the single most useful visual tell available from photos"
+      },
+      {
+        "material": "pewter / nickel alloy",
+        "mimics": "silver",
+        "typical_tell": "duller, grayer sheen than genuine silver's brighter white; heavier oxidation, sometimes with a bluish-black tarnish"
+      }
+    ]
+  },
+  "output_format_suggestion": {
+    "fields": [
+      "listing_id",
+      "suspicion_level (low|medium|high)",
+      "signals_triggered (list of signal ids/descriptions)",
+      "signals_missing_note (e.g. 'clasp not photographed - hallmark may be present but unseen')",
+      "recommended_action (string)",
+      "explicit_disclaimer: 'Visual suspicion only - not a confirmed material identification. No melt value should be calculated from this path.'"
+    ]
+  }
+}

@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { describeSignalVocabulary, HALLMARK_AREA_NOT_PHOTOGRAPHED } from "./unmarked-suspicion";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -36,6 +37,11 @@ export interface VisionScore {
   reasoning: string;
   flags: string[];
   confidence: "low" | "medium" | "high";
+  /**
+   * Signal IDs for the unmarked-metal suspicion path (path 3). Only populated
+   * when NO hallmark is visible — see unmarked-suspicion.ts for the vocabulary.
+   */
+  metalSignals: string[];
 }
 
 const VisionScoreSchema = z.object({
@@ -43,6 +49,8 @@ const VisionScoreSchema = z.object({
   reasoning: z.string(),
   flags: z.array(z.string()),
   confidence: z.enum(["low", "medium", "high"]),
+  // Optional so an older/looser model response still parses.
+  metalSignals: z.array(z.string()).optional().default([]),
 });
 
 // The system prompt MUST keep the model in "pre-filter" mode — never a verdict.
@@ -74,12 +82,21 @@ Score-LOWERING signals / red flags (note them in flags):
 - Repro tells: an applied/soldered-on nameplate where the mark should be cast into the mold (especially "Eisenberg" and "Trifari"); the bare word "Trifari" with no crown, © or patent wording; modern posts/clasps on a piece claimed to be 1940s or earlier.
 - GF / RGP / GP / 1/20 12k GF / vermeil = plated or gold-filled, NOT solid gold (gold-filled retains some value, plated minimal).
 
+UNMARKED-METAL OBSERVATIONS (only when NO hallmark/stamp is visible in any photo and none is mentioned in the text):
+Many genuinely precious pieces are simply not photographed from the angle that shows the mark. When you cannot see a mark, report which of the following you actually OBSERVE, as a list of IDs in "metalSignals". Report only what you can genuinely see — an empty list is the correct answer when the photos don't support any of them. Never use these to claim a material.
+
+${describeSignalVocabulary()}
+- ${HALLMARK_AREA_NOT_PHOTOGRAPHED}: the places a mark would normally be (clasp, inside of a ring band, back of a pendant) are not shown in any photo
+
+Leave "metalSignals" empty when a hallmark IS visible — that listing is valued from the mark instead.
+
 Output a JSON object ONLY, no markdown, with exactly this shape:
 {
   "score": <integer 1-10, how worth-a-closer-look this listing is>,
   "reasoning": "<one or two sentences, strictly about visual evidence>",
   "flags": ["<short observations, e.g. 'visible 925 stamp', 'glued rhinestones', 'flaking plating'>"],
-  "confidence": "low" | "medium" | "high"
+  "confidence": "low" | "medium" | "high",
+  "metalSignals": ["<IDs from the list above, or empty>"]
 }
 
 Be honest about uncertainty. If photos are too poor to judge, say so and use low confidence. You are a filter that surfaces candidates, never the final word.`;
@@ -211,12 +228,12 @@ export async function scoreListingImages(
   description = "",
 ): Promise<VisionScore> {
   if (imageUrls.length === 0) {
-    return { score: 1, reasoning: "No images available to assess.", flags: ["no-images"], confidence: "low" };
+    return { score: 1, reasoning: "No images available to assess.", flags: ["no-images"], confidence: "low", metalSignals: [] };
   }
   try {
     const imageContents = await resolveImageContents(imageUrls.slice(0, 4));
     if (imageContents.length === 0) {
-      return { score: 1, reasoning: "Could not download any listing images.", flags: ["image-download-failed"], confidence: "low" };
+      return { score: 1, reasoning: "Could not download any listing images.", flags: ["image-download-failed"], confidence: "low", metalSignals: [] };
     }
 
     const messages = [
@@ -243,7 +260,7 @@ export async function scoreListingImages(
     }
   } catch (err: any) {
     console.warn(`⚠️ Vision scoring failed: ${err.message}`);
-    return { score: 1, reasoning: `Scoring failed: ${err.message}`, flags: ["error"], confidence: "low" };
+    return { score: 1, reasoning: `Scoring failed: ${err.message}`, flags: ["error"], confidence: "low", metalSignals: [] };
   }
 }
 
@@ -265,6 +282,8 @@ export interface DetailedAnalysis {
   certaintyPreciousPct: number; // 0-100: certainty it contains REAL precious materials
   flags: string[]; // short tells, e.g. "injection-molding nub", "glued cabochons"
   analysis: string; // long-form markdown write-up (the Gemini-style breakdown)
+  /** Signal IDs for the unmarked-metal path — only when no hallmark is visible. */
+  metalSignals: string[];
 }
 
 const DetailHeaderSchema = z.object({
@@ -272,6 +291,7 @@ const DetailHeaderSchema = z.object({
   confidence: z.enum(["low", "medium", "high"]),
   certaintyPreciousPct: z.number().min(0).max(100),
   flags: z.array(z.string()),
+  metalSignals: z.array(z.string()).optional().default([]),
 });
 
 /**
@@ -331,9 +351,13 @@ ATTRIBUTION KNOWLEDGE (your field-guide training — apply when the photos allow
 - Precious-metal stamps: 925/Sterling, 375/9k, 585/14k, 750/18k, 916/22k (Indian/Middle-Eastern), 950/900/PT platinum. French: eagle head = 18k gold, boar's head/crab = silver, maker's mark in a lozenge. GF/RGP/GP/vermeil = layer over base metal or silver, not solid gold.
 - Attribution discipline: stack evidence — require several signals to agree before suggesting a maker or era, and say which signals you are missing.
 
+UNMARKED-METAL OBSERVATIONS — fill "metalSignals" ONLY when no hallmark/stamp is visible in any photo and none is mentioned in the text. Report just the IDs you genuinely observe (empty list if none apply). These never justify claiming a material; they only mark a piece as worth a closer look:
+${describeSignalVocabulary()}
+- ${HALLMARK_AREA_NOT_PHOTOGRAPHED}: the places a mark would normally be (clasp, inside of a ring band, back of a pendant) are not shown in any photo
+
 OUTPUT FORMAT — follow this EXACTLY. First output ONE line of compact JSON (no markdown fences) with the structured verdict, then the literal separator line ===ANALYSIS===, then the write-up as markdown, using these headings in order:
 
-{"score": <integer 1-10>, "confidence": "low"|"medium"|"high", "certaintyPreciousPct": <integer 0-100>, "flags": ["<short tells, e.g. 'glued cabochons', 'visible 925 stamp'>"]}
+{"score": <integer 1-10>, "confidence": "low"|"medium"|"high", "certaintyPreciousPct": <integer 0-100>, "flags": ["<short tells, e.g. 'glued cabochons', 'visible 925 stamp'>"], "metalSignals": ["<see below, or empty>"]}
 ===ANALYSIS===
 ### Classification & Era
 <piece type, likely historical period/design movement and geographic origin, one or two sentences>
@@ -355,6 +379,7 @@ export async function analyzeListingDetailed(
       confidence: "low",
       certaintyPreciousPct: 0,
       flags: ["no-images"],
+      metalSignals: [],
       analysis: "No photos were available for this listing, so nothing can be assessed visually.",
     };
   }
@@ -366,6 +391,7 @@ export async function analyzeListingDetailed(
         confidence: "low",
         certaintyPreciousPct: 0,
         flags: ["image-download-failed"],
+        metalSignals: [],
         analysis: "Could not download any listing images from Vinted. The CDN may have blocked the request.",
       };
     }
@@ -402,6 +428,7 @@ export async function analyzeListingDetailed(
       confidence: "low",
       certaintyPreciousPct: 0,
       flags: ["error"],
+      metalSignals: [],
       analysis: `The detailed analysis could not be completed: ${err.message}`,
     };
   }
@@ -418,19 +445,21 @@ export async function generateAlertMessage(input: {
   url: string;
   sellerCountry: string | null;
   score: VisionScore;
+  /** One-line valuation summary, e.g. "[Both] Trifari · Silver 925". */
+  valuation?: string;
 }): Promise<string> {
-  const { title, price, url, sellerCountry, score } = input;
+  const { title, price, url, sellerCountry, score, valuation } = input;
   const fallback = buildFallbackMessage(input);
   try {
     const messages = [
       {
         role: "system",
         content:
-          "Je schrijft korte, zakelijke Telegram-meldingen (in het Nederlands) voor een antiekhandelaar die kansrijke Vinted-sieraden zoekt. Max 6 regels. Wees nuchter: dit is een pre-filter-signaal, geen garantie. Gebruik de gegeven score en observaties. Sluit af met de link. Geen overdreven marketingtaal.",
+          "Je schrijft korte, zakelijke Telegram-meldingen (in het Nederlands) voor een antiekhandelaar die kansrijke Vinted-sieraden zoekt. Max 6 regels. Wees nuchter: dit is een pre-filter-signaal, geen garantie. Gebruik de gegeven score en observaties. Als er een waarderingsregel is meegegeven, vermeld je expliciet WAAROM het stuk interessant is: door de maker ('Brand match'), door het materiaal ('Scrap value'), of beide. Neem een smeltwaarde alleen over als die letterlijk is meegegeven — verzin nooit zelf een bedrag of gewicht. Sluit af met de link. Geen overdreven marketingtaal.",
       },
       {
         role: "user",
-        content: `Titel: ${title}\nPrijs: ${price}\nLand verkoper: ${sellerCountry || "onbekend"}\nScore: ${score.score}/10 (zekerheid: ${score.confidence})\nObservaties: ${score.flags.join(", ") || "geen"}\nReden: ${score.reasoning}\nLink: ${url}`,
+        content: `Titel: ${title}\nPrijs: ${price}\nLand verkoper: ${sellerCountry || "onbekend"}\nScore: ${score.score}/10 (zekerheid: ${score.confidence})\nWaardering: ${valuation || "onbekend"}\nObservaties: ${score.flags.join(", ") || "geen"}\nReden: ${score.reasoning}\nLink: ${url}`,
       },
     ];
     const data = await callOpenRouter(MESSAGE_MODEL_ID, messages, 300);
@@ -451,12 +480,14 @@ function buildFallbackMessage(input: {
   url: string;
   sellerCountry: string | null;
   score: VisionScore;
+  valuation?: string;
 }): string {
-  const { title, price, url, sellerCountry, score } = input;
+  const { title, price, url, sellerCountry, score, valuation } = input;
   return [
     `💎 Mogelijk kansrijke vondst (score ${score.score}/10, ${score.confidence})`,
     `*${title}*`,
     `💰 ${price}  |  📍 ${sellerCountry || "onbekend"}`,
+    valuation ? `🏷️ ${valuation}` : "",
     score.flags.length ? `🔎 ${score.flags.join(", ")}` : "",
     score.reasoning,
     url,
