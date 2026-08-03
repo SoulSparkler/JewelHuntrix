@@ -26,9 +26,9 @@ export async function runScan(): Promise<{ ok: boolean; partial: boolean; listin
   let partial = false;
   const deadline = Date.now() + SCAN_BUDGET_MS;
 
-  await storage.markScanStarted();
-
   try {
+    await storage.markScanStarted();
+
     // Order by least-recently-scanned first (never-scanned = oldest). Without
     // this, a fixed createdAt order lets whichever search sits first in the
     // list (e.g. one with a constant stream of "newest_first" listings) eat

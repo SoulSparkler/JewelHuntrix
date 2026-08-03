@@ -1,0 +1,35 @@
+name: Keep Supabase awake
+
+# Independent heartbeat, separate from Netlify's own scheduled functions.
+# The Netlify "scan" cron already queries the DB every 15 min, which should
+# be enough to satisfy Supabase's free-tier "a few requests a day" activity
+# requirement — but if Netlify's scheduler ever silently stops firing, this
+# workflow still keeps hitting the DB so the project doesn't auto-pause.
+# Once paused, only a manual dashboard resume (or Supabase Pro) brings it back.
+on:
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit db-health endpoint
+        run: |
+          set -e
+          response=$(curl -s -o /tmp/body.json -w "%{http_code}" -m 20 https://treasurehuntrix.netlify.app/api/db-health)
+          cat /tmp/body.json
+          echo "HTTP status: $response"
+          if [ "$response" -ge 300 ]; then
+            echo "::error::db-health returned HTTP $response"
+            exit 1
+          fi
+          # db-health answers 200 even when the DB is unreachable — the verdict
+          # is in the body, not the status code. Without this check a dead
+          # database (wrong project ref, paused project, bad password) looks
+          # green here forever, which is exactly how it went unnoticed before.
+          if [ "$(jq -r '.connection' /tmp/body.json)" != "true" ]; then
+            echo "::error::DB unreachable: $(jq -r '.tables.error // "unknown"' /tmp/body.json)"
+            exit 1
+          fi

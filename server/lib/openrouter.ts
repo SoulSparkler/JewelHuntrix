@@ -56,6 +56,21 @@ You score listing PHOTOS only. You are NOT an authenticator and you must NEVER s
 - wear patterns consistent with solid precious metal vs. flaking/brassing plating
 - overall style and craftsmanship
 
+FIELD-GUIDE SIGNALS (from the dealer's sourcing reference — use as scoring inputs, several must agree, none is proof alone):
+
+Score-RAISING signals:
+- Precious-metal stamps: 925/Sterling, 375/9k, 585/14k, 750/18k, 916/22k, 950/900/PT/Plat. French marks: eagle head = 18k gold, boar's head or crab = silver. A readable stamp is a strong signal regardless of design.
+- Collectible maker names in title/description or visibly stamped: Juliana, DeLizza, D&E, Eisenberg, Schreiner, Trifari (with crown), Marcel Boucher, Marboux, Miriam Haskell, Weiss, Hattie Carnegie, Kenneth Jay Lane/KJL, Corocraft, Vendome, Coro Duette, Schiaparelli, Gripoix, Dior, Chanel, Joseff of Hollywood.
+- Quality-construction terms or visual evidence: prong-set, bezel-set, open-back/unfoiled stones (daylight visible through stones from the back), soldered stone cups, five-link bracelet construction, hand-wired beads, navette/rivoli/watermelon/easter-egg specialty stones, parure/demi-parure (matching sets), pâte de verre / poured glass.
+- A photo showing the BACK of a piece is valuable evidence — construction and marks live there. UNMARKED is NOT worthless: top makers (DeLizza & Elster "Juliana", early Haskell, Schiaparelli pre-1930) never permanently signed pieces; judge those by construction.
+- "Sterling" on a costume-style piece suggests 1940s wartime manufacture (higher value).
+
+Score-LOWERING signals / red flags (note them in flags):
+- Stones glued flat into shallow recesses, visible adhesive, plastic stones, heavy brassing/flaking plating.
+- "style", "inspired by", "in the manner of" next to a maker name = NOT an attributed piece.
+- Repro tells: an applied/soldered-on nameplate where the mark should be cast into the mold (especially "Eisenberg" and "Trifari"); the bare word "Trifari" with no crown, © or patent wording; modern posts/clasps on a piece claimed to be 1940s or earlier.
+- GF / RGP / GP / 1/20 12k GF / vermeil = plated or gold-filled, NOT solid gold (gold-filled retains some value, plated minimal).
+
 Output a JSON object ONLY, no markdown, with exactly this shape:
 {
   "score": <integer 1-10, how worth-a-closer-look this listing is>,
@@ -303,6 +318,15 @@ Write a clear, engaging breakdown covering:
 - Be specific about WHY each clue points to fine jewellery or to costume/fashion.
 
 If a photo is too poor to judge a detail, say so honestly — do not guess past what you can actually see.
+
+ATTRIBUTION KNOWLEDGE (your field-guide training — apply when the photos allow):
+- Reading a mark: © on US costume jewellery generally means post-1955. "Pat. Pend."/patent numbers date to a filing window. "Sterling" on costume pieces suggests wartime manufacture (~1942–48, restricted pot metal) and higher intrinsic value. Genuine marks from makers like Eisenberg are cast INTO the mold; an applied soldered-on nameplate (especially "Eisenberg"/"Trifari") is a classic reproduction tell. The bare word "Trifari" without a crown, © or patent wording is a forgery red flag.
+- Findings date a piece more reliably than style: brooches — C-clasp = early/antique, trombone clasp = European/early 20th c., roll-over safety catch = mid-century onward; earrings — screw-backs predate clip-backs predate posts (posts dominant after late 1960s; posts on a claimed-1940s piece is a warning). Anachronistic findings = possible repro.
+- Unmarked attribution — the DeLizza & Elster ("Juliana") identification stack, requiring SEVERAL traits together: five-link bracelet construction with connector bands; figure-eight solder "puddling" where round stone cups were joined on the back; sparse heavy rivets (dozens of rivets/"swedged" construction = Beau Jewels or Judy Lee, NOT D&E); pin assembly soldered directly to the body (riveted pin assembly usually means NOT Juliana); open-backed elongated navettes; specialty stones (easter-egg cabochons, watermelon, rivoli, margarita, art glass). Never call a piece "Juliana" on one trait alone.
+- Other maker tells: Schreiner = inverted (upside-down) stone settings and keystone-shaped stones; Miriam Haskell = hand-wired seed pearls on Russian-gold filigree; Boucher = fine enough to pass for real jewellery (and made NO Lucite jelly-bellies — a "Boucher" jelly-belly is fake); Gripoix = hand-poured pâte de verre glass.
+- Quality hierarchy of stone mounting: open-back/unfoiled prong-set stones > closed-back foiled prong-set > bezel > glued into shallow wells. Foiled closed-back suggests pre-war; open-back unfoiled suggests confident 1950s–60s quality.
+- Precious-metal stamps: 925/Sterling, 375/9k, 585/14k, 750/18k, 916/22k (Indian/Middle-Eastern), 950/900/PT platinum. French: eagle head = 18k gold, boar's head/crab = silver, maker's mark in a lozenge. GF/RGP/GP/vermeil = layer over base metal or silver, not solid gold.
+- Attribution discipline: stack evidence — require several signals to agree before suggesting a maker or era, and say which signals you are missing.
 
 OUTPUT FORMAT — follow this EXACTLY. First output ONE line of compact JSON (no markdown fences) with the structured verdict, then the literal separator line ===ANALYSIS===, then the write-up as markdown, using these headings in order:
 
