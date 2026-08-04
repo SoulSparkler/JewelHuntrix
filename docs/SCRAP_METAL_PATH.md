@@ -219,10 +219,44 @@ keyword monitoring, alert on the body *not* containing `"ok":true`. Same lesson
 Overlap between triggers is harmless: scanning dedupes via `analyzed_listings`,
 so a doubled run clears backlog faster rather than re-alerting.
 
-**Coverage caveat:** each run typically gets through only ~1 saved search before
-the budget expires, so with 4 active searches a full sweep takes ~4 runs (~2h at
-a 30-min cadence). If a search looks stale, that is usually why — check
-`lastScannedAt` per search via `GET /api/searches`.
+**Throughput.** Listings are vision-scored `SCAN_CONCURRENCY` at a time (default
+5). The AI call is almost entirely network wait, so running several in flight
+costs no extra per-listing OpenRouter spend — it only stops them queueing. At a
+concurrency of 1 a run cleared roughly one saved search before the budget
+expired, making a full sweep of four searches take ~4 runs (~2h). If a search
+still looks stale, check `lastScannedAt` per search via `GET /api/searches`.
+
+Two cheap filters run before any AI call and do not consume the budget: the
+`analyzed_listings` dedupe, and a conservative title-only keyword reject
+(`PREFILTER_BANNED_WORDS`, see `server/lib/prefilter.ts`).
+
+## Supply: multi-locale scanning
+
+`VINTED_EXTRA_DOMAINS` (e.g. `fr,de,be,it,es`) runs every **catalog** search
+against those locale domains as well as the one its URL names. vinted.nl does
+surface cross-border listings, but ranks NL sellers first — measured on one
+`zilver 925 lot` search, NL alone returned 48 listings while the fan-out returned
+164, of which **116 were listings the NL-only scan never saw**. The domains are
+queried in parallel, so the extra supply costs ~0.6s, not 6×.
+
+- Item ids are global across Vinted's locale front-ends, so a cross-listed piece
+  dedupes to **one** listing and cannot alert twice.
+- Results are **interleaved round-robin**, not concatenated. A run only scores a
+  handful of listings, so concatenating would mean NL's whole page had to drain
+  before FR was ever touched — and with new NL listings always arriving, the
+  later countries would starve. This is the same starvation that ordering
+  searches by least-recently-scanned fixed one level up.
+- Locale-specific `catalog_ids` / `brand_ids` / `size_ids` are **stripped** when
+  replaying a search on another domain, because those ids are per-marketplace and
+  would silently select a different category. Keyword and price filters carry over.
+- **Member/seller URLs never fan out** — a wardrobe is not duplicated per locale.
+- A domain that fails is dropped with a warning rather than failing the search.
+  Only an all-domains failure throws (and therefore alerts).
+
+A Vinted `401`/`403`/`429` is retried once with a freshly minted anonymous cookie
+and a different user agent before being treated as a failure; the token can be
+invalidated between bootstrap and use, and one retry recovers that far more often
+than it costs.
 
 ## Known gaps
 

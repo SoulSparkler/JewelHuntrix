@@ -12,8 +12,13 @@
 #   MESSAGE_MODEL_ID        e.g. openai/gpt-4o-mini (optional, has default)
 #   TELEGRAM_BOT_TOKEN      Telegram bot token
 #   TELEGRAM_CHAT_ID        Telegram chat id
-#   VINTED_BASE_URL         optional, defaults to https://www.vinted.nl  (KEEP NL)
+#   VINTED_BASE_URL         optional, defaults to https://www.vinted.nl
+#   VINTED_EXTRA_DOMAINS    optional, e.g. fr,de,be,it,es — extra locale domains
+#                           each catalog search also runs against (parallel)
 #   VISION_SCORE_THRESHOLD  optional, default 7
+#   SCAN_CONCURRENCY        optional, default 5 — listings vision-scored at once;
+#                           biggest lever on how much a run gets through
+#   PREFILTER_BANNED_WORDS  optional — title-only rejects before any AI call
 #   SCAN_CRON / HEALTH_CRON optional cron overrides
 #
 # Scrap-metal (melt value) path — all optional:
