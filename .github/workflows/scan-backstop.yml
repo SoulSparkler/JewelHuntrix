@@ -1,0 +1,69 @@
+name: Scan backstop
+
+# Independent trigger for the Vinted scan, separate from Netlify's own
+# scheduled function.
+#
+# WHY THIS EXISTS: on 2026-08-03 the Netlify `scan` cron silently stopped
+# firing for ~16 hours. It recorded no failure — scan_state showed
+# lastError: null and consecutiveFailures: 0 the entire time, because the
+# function was never invoked at all rather than invoked-and-failing. Telegram
+# went quiet and nothing surfaced the problem. This workflow calls the same
+# entry point over HTTP so a stalled Netlify scheduler can no longer mean
+# "no scans at all", and a failure here shows up as a red run in the Actions
+# tab instead of silence.
+#
+# Overlap with the Netlify cron is harmless: scanning is incremental and
+# dedupes against the analyzed_listings table, so a doubled run simply works
+# through the backlog faster rather than re-analyzing (or re-alerting on)
+# anything.
+on:
+  schedule:
+    # Every 30 minutes, matching the Netlify schedule in netlify/functions/scan.mts.
+    # GitHub's scheduled runs are best-effort and can be delayed under load, so
+    # treat this as a safety net rather than a precise timer.
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+# Never let two scans run concurrently — each invocation is time-boxed and
+# resumes from the DB, so a queued duplicate adds cost without adding coverage.
+concurrency:
+  group: scan-backstop
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger scan
+        run: |
+          set -e
+          # Netlify kills functions at ~30s and the scan is time-boxed to
+          # SCAN_BUDGET_MS (default 20s), so allow a little headroom past that.
+          response=$(curl -s -X POST -o /tmp/body.json -w "%{http_code}" -m 40 \
+            https://treasurehuntrix.netlify.app/api/scan)
+          cat /tmp/body.json
+          echo ""
+          echo "HTTP status: $response"
+
+          if [ "$response" -ge 300 ]; then
+            echo "::error::scan returned HTTP $response"
+            exit 1
+          fi
+
+          # The endpoint answers 200 even when individual searches failed —
+          # the verdict is in the body, matching the db-health lesson in
+          # keep-alive.yml. Without this, a scan erroring on every search
+          # would look green here forever.
+          if [ "$(jq -r '.ok' /tmp/body.json)" != "true" ]; then
+            echo "::error::scan reported failure: $(jq -r '.errors | join(" ~ ")' /tmp/body.json)"
+            exit 1
+          fi
+
+          checked=$(jq -r '.listingsChecked' /tmp/body.json)
+          found=$(jq -r '.newFindings' /tmp/body.json)
+          partial=$(jq -r '.partial' /tmp/body.json)
+          echo "Analyzed $checked listing(s), $found new finding(s), partial=$partial"
+
+          # `partial: true` is normal and expected — it means the time budget
+          # ran out with work remaining, which the next run picks up. It is
+          # explicitly NOT a failure condition.

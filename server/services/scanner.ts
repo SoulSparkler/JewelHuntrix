@@ -52,7 +52,7 @@ export interface ScanOutcome {
  *
  * Serverless invocations (Netlify) are killed after ~30s, so we time-box the
  * expensive per-listing AI work and stop GRACEFULLY when the budget runs out.
- * Analyzed listings are persisted, so the next invocation (cron every 15 min,
+ * Analyzed listings are persisted, so the next invocation (cron every 30 min,
  * or a manual trigger) continues exactly where this one stopped.
  */
 export async function scanSearchQuery(searchQuery: SearchQuery, deadline: number = Number.MAX_SAFE_INTEGER): Promise<ScanOutcome> {
