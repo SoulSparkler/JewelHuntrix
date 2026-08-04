@@ -175,11 +175,54 @@ claims only and can never veto a gold or platinum mark in a mixed lot.
 See the valuation block in `.env.example`. The two to know:
 
 ```
-SCRAP_ALERT_MODE=underpriced_only     # | all_hallmarks | off
+SCRAP_ALERT_MODE=all_hallmarks        # | underpriced_only | off
 UNMARKED_ALERT_MODE=medium_and_high   # | high_only | off
 ```
 
 These control when a path may surface a listing the *vision* pre-filter skipped.
+`SCRAP_ALERT_MODE` defaults to `all_hallmarks` for the calibration period —
+`underpriced_only` needs both a seller-stated weight and a live spot price, so
+with no price provider configured it can never fire.
+
+## Scan scheduling
+
+The scan is time-boxed (~20s per run against Netlify's ~30s function limit) and
+**incremental** — each run analyzes what fits and the next resumes from the
+`analyzed_listings` table. It therefore needs triggering repeatedly.
+
+| Trigger | Status |
+|---|---|
+| External cron → `POST /api/scan` | **Authoritative.** Every 30 min. |
+| Netlify scheduled function | Backup. Silently stopped for ~16h on 2026-08-03. |
+| GitHub Actions (`scan-backstop.yml`) | Manual dispatch only. |
+
+**Why not GitHub Actions:** its `*/30` schedule arrived ~23 minutes late and
+skipped whole slots outright. GitHub documents scheduled workflows as
+best-effort and may drop them under load. The workflow is kept for manual
+dispatch (Actions tab → "Scan backstop" → "Run workflow") as a quick way to
+prove the pipeline still works without needing a terminal.
+
+**External cron setup** (cron-job.org, UptimeRobot, or similar):
+
+```
+Method:   POST
+URL:      https://treasurehuntrix.netlify.app/api/scan
+Interval: every 30 minutes
+Timeout:  40s   (scan is budgeted to ~20s; Netlify kills at ~30s)
+```
+
+Note `/api/scan` answers **HTTP 200 even when individual searches failed** —
+the verdict is in the body (`"ok": true/false`). If the cron service supports
+keyword monitoring, alert on the body *not* containing `"ok":true`. Same lesson
+`keep-alive.yml` encodes for `/api/db-health`.
+
+Overlap between triggers is harmless: scanning dedupes via `analyzed_listings`,
+so a doubled run clears backlog faster rather than re-alerting.
+
+**Coverage caveat:** each run typically gets through only ~1 saved search before
+the budget expires, so with 4 active searches a full sweep takes ~4 runs (~2h at
+a 30-min cadence). If a search looks stale, that is usually why — check
+`lastScannedAt` per search via `GET /api/searches`.
 
 ## Known gaps
 

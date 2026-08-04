@@ -1,14 +1,20 @@
 name: Keep Supabase awake
 
 # Independent heartbeat, separate from Netlify's own scheduled functions.
-# The Netlify "scan" cron already queries the DB every 15 min, which should
-# be enough to satisfy Supabase's free-tier "a few requests a day" activity
-# requirement — but if Netlify's scheduler ever silently stops firing, this
-# workflow still keeps hitting the DB so the project doesn't auto-pause.
-# Once paused, only a manual dashboard resume (or Supabase Pro) brings it back.
+# If Netlify's scheduler silently stops firing (as it did on 2026-08-03), this
+# workflow still keeps hitting the DB so the Supabase project doesn't
+# auto-pause. Once paused, only a manual dashboard resume (or Supabase Pro)
+# brings it back.
+#
+# Hourly is deliberate. Supabase's free tier only needs "a few requests a day"
+# to stay awake, so */20 was ~72 runs/day of pure overkill — and because
+# GitHub bills Actions per run rounded UP to a whole minute, that alone came to
+# roughly 2,160 min/month against a 2,000-minute allowance. The repo is public
+# now (so minutes are free), but there is still no reason to burn 24x the
+# needed requests.
 on:
   schedule:
-    - cron: "*/20 * * * *"
+    - cron: "0 * * * *"
   workflow_dispatch: {}
 
 jobs:

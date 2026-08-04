@@ -19,11 +19,20 @@ const ASSUMED_SHIPPING_EUR = parseFloat(process.env.ASSUMED_SHIPPING_EUR || "3.5
  * over. A hallmarked listing with poor photos is exactly the case the vision
  * filter mishandles — but alerting on every "925" listing would be pure noise.
  *
- *   underpriced_only (default) — only a CONFIRMED-weight bargain vs melt value
- *   all_hallmarks              — any solid precious-metal mark
- *   off                        — scrap never overrides the vision threshold
+ *   all_hallmarks    (current default) — any solid precious-metal mark
+ *   underpriced_only — only a CONFIRMED-weight bargain vs melt value
+ *   off              — scrap never overrides the vision threshold
+ *
+ * TEST-WEEK DEFAULT: this is `all_hallmarks` rather than the more conservative
+ * `underpriced_only` on purpose. `underpriced_only` needs BOTH a seller-stated
+ * weight AND a live spot price; with METAL_PRICE_PROVIDER unset there is no
+ * spot price, so that mode can never fire and the scrap path would be dead
+ * code — we'd spend a week "testing" nothing but the old vision filter.
+ * `all_hallmarks` trades noise for throughput so hallmark-detection PRECISION
+ * can actually be measured. Once precision looks good, set
+ * SCRAP_ALERT_MODE=underpriced_only (env var wins over this default).
  */
-const SCRAP_ALERT_MODE = (process.env.SCRAP_ALERT_MODE || "underpriced_only").toLowerCase();
+const SCRAP_ALERT_MODE = (process.env.SCRAP_ALERT_MODE || "all_hallmarks").toLowerCase();
 
 /**
  * Whether the unmarked-suspicion path may surface a listing on its own.

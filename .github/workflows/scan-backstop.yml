@@ -1,27 +1,34 @@
 name: Scan backstop
 
-# Independent trigger for the Vinted scan, separate from Netlify's own
-# scheduled function.
+# Manual emergency trigger for the Vinted scan.
 #
 # WHY THIS EXISTS: on 2026-08-03 the Netlify `scan` cron silently stopped
 # firing for ~16 hours. It recorded no failure — scan_state showed
 # lastError: null and consecutiveFailures: 0 the entire time, because the
 # function was never invoked at all rather than invoked-and-failing. Telegram
-# went quiet and nothing surfaced the problem. This workflow calls the same
-# entry point over HTTP so a stalled Netlify scheduler can no longer mean
-# "no scans at all", and a failure here shows up as a red run in the Actions
-# tab instead of silence.
+# went quiet and nothing surfaced the problem.
 #
-# Overlap with the Netlify cron is harmless: scanning is incremental and
+# Running a scan by hand is the fastest way to confirm the pipeline still
+# works end-to-end when that happens again, without needing a terminal.
+#
+# Overlap with any other trigger is harmless: scanning is incremental and
 # dedupes against the analyzed_listings table, so a doubled run simply works
 # through the backlog faster rather than re-analyzing (or re-alerting on)
 # anything.
+# NO `schedule:` HERE — ON PURPOSE.
+#
+# This ran on a "*/30" cron briefly and proved the point about GitHub's
+# scheduler: runs arrived ~23 minutes late and whole slots were skipped
+# (13:30 never fired at all). GitHub documents scheduled workflows as
+# best-effort and explicitly may drop them under load, which is not a
+# property you want in the thing that decides whether you see a listing
+# before someone else buys it.
+#
+# The 30-minute scan cadence therefore lives in an EXTERNAL cron service
+# hitting POST /api/scan directly (see docs/SCRAP_METAL_PATH.md). This
+# workflow stays as a manually-dispatchable emergency trigger: Actions tab →
+# "Scan backstop" → "Run workflow".
 on:
-  schedule:
-    # Every 30 minutes, matching the Netlify schedule in netlify/functions/scan.mts.
-    # GitHub's scheduled runs are best-effort and can be delayed under load, so
-    # treat this as a safety net rather than a precise timer.
-    - cron: "*/30 * * * *"
   workflow_dispatch: {}
 
 # Never let two scans run concurrently — each invocation is time-boxed and
