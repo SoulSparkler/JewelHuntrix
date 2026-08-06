@@ -1,6 +1,6 @@
 name: Scan backstop
 
-# Manual emergency trigger for the Vinted scan.
+# Primary scheduled trigger for the Vinted scan, plus a manual dispatch.
 #
 # WHY THIS EXISTS: on 2026-08-03 the Netlify `scan` cron silently stopped
 # firing for ~16 hours. It recorded no failure — scan_state showed
@@ -8,27 +8,25 @@ name: Scan backstop
 # function was never invoked at all rather than invoked-and-failing. Telegram
 # went quiet and nothing surfaced the problem.
 #
-# Running a scan by hand is the fastest way to confirm the pipeline still
-# works end-to-end when that happens again, without needing a terminal.
+# HISTORY LESSON (2026-08-06): the `schedule:` below was once removed in
+# favor of an external cron service (cron-job.org / UptimeRobot) because
+# GitHub's scheduler is best-effort — runs arrived ~23 minutes late and
+# whole slots were skipped. But that external cron was never actually
+# created, Netlify's own cron had already silently died once, and the result
+# was ~48 hours of zero scanning with nothing to notice. A jittery trigger
+# that verifiably fires beats a punctual one that doesn't exist. So the
+# schedule is back, at */20 so that late/skipped slots still average out to
+# roughly the intended 30-minute cadence. If an external cron is ever truly
+# set up (see docs/SCRAP_METAL_PATH.md), this can stay on anyway — overlap
+# is harmless: scanning is incremental and dedupes against the
+# analyzed_listings table, so a doubled run simply works through the backlog
+# faster rather than re-analyzing (or re-alerting on) anything.
 #
-# Overlap with any other trigger is harmless: scanning is incremental and
-# dedupes against the analyzed_listings table, so a doubled run simply works
-# through the backlog faster rather than re-analyzing (or re-alerting on)
-# anything.
-# NO `schedule:` HERE — ON PURPOSE.
-#
-# This ran on a "*/30" cron briefly and proved the point about GitHub's
-# scheduler: runs arrived ~23 minutes late and whole slots were skipped
-# (13:30 never fired at all). GitHub documents scheduled workflows as
-# best-effort and explicitly may drop them under load, which is not a
-# property you want in the thing that decides whether you see a listing
-# before someone else buys it.
-#
-# The 30-minute scan cadence therefore lives in an EXTERNAL cron service
-# hitting POST /api/scan directly (see docs/SCRAP_METAL_PATH.md). This
-# workflow stays as a manually-dispatchable emergency trigger: Actions tab →
-# "Scan backstop" → "Run workflow".
+# A failed run here produces a GitHub failure email — that is the alarm bell
+# this pipeline was missing.
 on:
+  schedule:
+    - cron: "*/20 * * * *"
   workflow_dispatch: {}
 
 # Never let two scans run concurrently — each invocation is time-boxed and

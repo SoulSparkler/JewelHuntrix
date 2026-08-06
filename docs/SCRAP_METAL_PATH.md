@@ -192,17 +192,22 @@ The scan is time-boxed (~20s per run against Netlify's ~30s function limit) and
 
 | Trigger | Status |
 |---|---|
-| External cron → `POST /api/scan` | **Authoritative.** Every 30 min. |
-| Netlify scheduled function | Backup. Silently stopped for ~16h on 2026-08-03. |
-| GitHub Actions (`scan-backstop.yml`) | Manual dispatch only. |
+| GitHub Actions (`scan-backstop.yml`) | **Authoritative.** `*/20` cron + manual dispatch. Fails loudly (GitHub failure email). |
+| Netlify scheduled function | Backup. Silently stopped for ~16h on 2026-08-03 and again ~2026-08-04→06. |
+| External cron → `POST /api/scan` | Optional upgrade — **was never actually set up.** |
 
-**Why not GitHub Actions:** its `*/30` schedule arrived ~23 minutes late and
-skipped whole slots outright. GitHub documents scheduled workflows as
-best-effort and may drop them under load. The workflow is kept for manual
-dispatch (Actions tab → "Scan backstop" → "Run workflow") as a quick way to
-prove the pipeline still works without needing a terminal.
+**History:** on 2026-08-04 the GitHub schedule was removed in favor of an
+external cron service, because GitHub's scheduler is best-effort (runs ~23 min
+late, slots skipped). But the external cron was never created, Netlify's cron
+had already died silently once, and the result was ~48 hours of zero scans
+with no alarm. Lesson: a jittery trigger that verifiably fires beats a punctual
+one that doesn't exist. The GitHub schedule is back at `*/20` so late/skipped
+slots still average out near the intended 30-minute cadence, and a failing run
+produces a GitHub notification email — the missing alarm bell.
 
-**External cron setup** (cron-job.org, UptimeRobot, or similar):
+**External cron setup, if you ever want the punctual version too**
+(cron-job.org, UptimeRobot, or similar — leave the GitHub cron on regardless;
+overlap is harmless):
 
 ```
 Method:   POST

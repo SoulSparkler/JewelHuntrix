@@ -235,7 +235,7 @@ export async function scanSearchQuery(searchQuery: SearchQuery, deadline: number
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 15);
 
-      await storage.createFinding({
+      const finding = await storage.createFinding({
         listingId: listing.listingId,
         listingUrl: listing.listingUrl,
         listingTitle: listing.title,
@@ -262,6 +262,9 @@ export async function scanSearchQuery(searchQuery: SearchQuery, deadline: number
         valuation: describeValuation(valuation),
       });
       await sendTelegramMessage(message, listing.listingUrl);
+      // Flip the flag only after the send succeeded — the column is the
+      // record of delivery, not of intent. It used to stay false forever.
+      await storage.markFindingTelegramSent(finding.id);
 
       await storage.createAnalyzedListing({
         listingId: listing.listingId,

@@ -35,6 +35,7 @@ export interface IStorage {
   getFinding(id: string): Promise<Finding | undefined>;
   getFindingByListingUrl(listingUrl: string): Promise<Finding | undefined>;
   createFinding(finding: InsertFinding): Promise<Finding>;
+  markFindingTelegramSent(id: string): Promise<void>;
   deleteFinding(id: string): Promise<boolean>;
   deleteExpiredFindings(): Promise<void>;
 
@@ -145,6 +146,12 @@ export class PostgresStorage implements IStorage {
       telegramSent: insertFinding.telegramSent ?? false,
     } as any).returning();
     return results[0];
+  }
+
+  async markFindingTelegramSent(id: string): Promise<void> {
+    await db.update(findings)
+      .set({ telegramSent: true })
+      .where(eq(findings.id, id));
   }
 
   async deleteFinding(id: string): Promise<boolean> {

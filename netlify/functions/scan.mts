@@ -10,11 +10,12 @@
 // 30 minutes: frequent small bites instead of one impossible big one.
 //
 // NOTE: this schedule has silently stopped firing before (a ~16h gap on
-// 2026-08-03 with no error recorded — scan_state showed lastError: null the
-// whole time, i.e. never invoked rather than failing). .github/workflows/
-// scan-backstop.yml hits POST /api/scan on the same 30-minute cadence as an
-// independent safety net. Overlap is harmless: scans dedupe via the
-// analyzed_listings table, so a doubled run just clears the backlog faster.
+// 2026-08-03, then again ~2026-08-04→06, with no error recorded — scan_state
+// showed lastError: null the whole time, i.e. never invoked rather than
+// failing). It is therefore only the BACKUP: the authoritative cadence is
+// .github/workflows/scan-backstop.yml hitting POST /api/scan on a */20 cron.
+// Overlap is harmless: scans dedupe via the analyzed_listings table, so a
+// doubled run just clears the backlog faster.
 //
 // (The previous version slept a random 0-90s "jitter" before starting, which
 // exceeded the 30s limit — scheduled scans died in their own sleep. Removed.)
